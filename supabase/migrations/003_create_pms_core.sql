@@ -6,13 +6,13 @@
 -- PROCUREMENT PROPOSALS (PPMP/APP)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.procurement_proposals (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     proposal_number VARCHAR(50) UNIQUE NOT NULL,
     type VARCHAR(10) NOT NULL CHECK (type IN ('PPMP', 'APP')),
     category VARCHAR(20) NOT NULL CHECK (category IN ('goods', 'services', 'infrastructure')),
     level VARCHAR(20) NOT NULL CHECK (level IN ('school', 'division')),
-    division_id UUID NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
-    school_id UUID REFERENCES assets.schools(id) ON DELETE RESTRICT,
+    division_id BIGINT NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
+    school_id BIGINT REFERENCES assets.schools(id) ON DELETE RESTRICT,
     fiscal_year INTEGER NOT NULL,
     quarter INTEGER CHECK (quarter BETWEEN 1 AND 4),
     title VARCHAR(500) NOT NULL,
@@ -24,11 +24,11 @@ CREATE TABLE IF NOT EXISTS assets.procurement_proposals (
         'draft', 'submitted', 'under_evaluation', 'approved', 'rejected', 'returned', 'cancelled'
     )),
     version INTEGER NOT NULL DEFAULT 1,
-    parent_proposal_id UUID REFERENCES assets.procurement_proposals(id) ON DELETE SET NULL,
+    parent_proposal_id BIGINT REFERENCES assets.procurement_proposals(id) ON DELETE SET NULL,
     change_reason TEXT,
-    submitted_by UUID REFERENCES assets.users(id),
+    submitted_by BIGINT REFERENCES assets.users(id),
     submitted_at TIMESTAMPTZ,
-    approved_by UUID REFERENCES assets.users(id),
+    approved_by BIGINT REFERENCES assets.users(id),
     approved_at TIMESTAMPTZ,
     document_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS assets.procurement_proposals (
 -- PROPOSAL ITEMS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.proposal_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    proposal_id UUID NOT NULL REFERENCES assets.procurement_proposals(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    proposal_id BIGINT NOT NULL REFERENCES assets.procurement_proposals(id) ON DELETE CASCADE,
     item_code VARCHAR(50),
     item_name VARCHAR(500) NOT NULL,
     description TEXT,
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS assets.proposal_items (
 -- PRE-PROCUREMENT EVALUATIONS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.pre_procurement_evaluations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    proposal_id UUID NOT NULL REFERENCES assets.procurement_proposals(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    proposal_id BIGINT NOT NULL REFERENCES assets.procurement_proposals(id) ON DELETE CASCADE,
     evaluation_number VARCHAR(50) UNIQUE NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN (
         'pending', 'under_review', 'approved', 'rejected', 'returned', 'cancelled'
@@ -72,22 +72,22 @@ CREATE TABLE IF NOT EXISTS assets.pre_procurement_evaluations (
     -- Stage 1: Supply Officer
     supply_officer_reviewed BOOLEAN DEFAULT false,
     supply_officer_remarks TEXT,
-    supply_officer_reviewed_by UUID REFERENCES assets.users(id),
+    supply_officer_reviewed_by BIGINT REFERENCES assets.users(id),
     supply_officer_reviewed_at TIMESTAMPTZ,
     -- Stage 2: Budget Officer
     budget_officer_reviewed BOOLEAN DEFAULT false,
     budget_officer_remarks TEXT,
-    budget_officer_reviewed_by UUID REFERENCES assets.users(id),
+    budget_officer_reviewed_by BIGINT REFERENCES assets.users(id),
     budget_officer_reviewed_at TIMESTAMPTZ,
     -- Stage 3: Technical Evaluator
     technical_evaluator_reviewed BOOLEAN DEFAULT false,
     technical_evaluator_remarks TEXT,
-    technical_evaluator_reviewed_by UUID REFERENCES assets.users(id),
+    technical_evaluator_reviewed_by BIGINT REFERENCES assets.users(id),
     technical_evaluator_reviewed_at TIMESTAMPTZ,
     -- Stage 4: BAC
     bac_reviewed BOOLEAN DEFAULT false,
     bac_remarks TEXT,
-    bac_reviewed_by UUID REFERENCES assets.users(id),
+    bac_reviewed_by BIGINT REFERENCES assets.users(id),
     bac_reviewed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS assets.pre_procurement_evaluations (
 -- PROCUREMENT METHOD CONFIGURATIONS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.procurement_method_configs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     method VARCHAR(50) UNIQUE NOT NULL CHECK (method IN (
         'small_value_procurement', 'shopping', 'agency_to_agency', 'public_bidding', 'repeat_order'
     )),
@@ -116,14 +116,14 @@ CREATE TABLE IF NOT EXISTS assets.procurement_method_configs (
 -- PURCHASE REQUESTS (PR)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.purchase_requests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     pr_number VARCHAR(50) UNIQUE NOT NULL,
-    proposal_id UUID REFERENCES assets.procurement_proposals(id) ON DELETE SET NULL,
-    evaluation_id UUID REFERENCES assets.pre_procurement_evaluations(id) ON DELETE SET NULL,
+    proposal_id BIGINT REFERENCES assets.procurement_proposals(id) ON DELETE SET NULL,
+    evaluation_id BIGINT REFERENCES assets.pre_procurement_evaluations(id) ON DELETE SET NULL,
     procurement_method VARCHAR(50) REFERENCES assets.procurement_method_configs(method),
-    division_id UUID NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
-    school_id UUID REFERENCES assets.schools(id) ON DELETE RESTRICT,
-    requested_by UUID NOT NULL REFERENCES assets.users(id),
+    division_id BIGINT NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
+    school_id BIGINT REFERENCES assets.schools(id) ON DELETE RESTRICT,
+    requested_by BIGINT NOT NULL REFERENCES assets.users(id),
     department VARCHAR(255),
     purpose TEXT NOT NULL,
     total_amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS assets.purchase_requests (
         'pending_sds', 'approved', 'rejected', 'returned', 'cancelled'
     )),
     current_approval_stage INTEGER NOT NULL DEFAULT 0,
-    approved_by UUID REFERENCES assets.users(id),
+    approved_by BIGINT REFERENCES assets.users(id),
     approved_at TIMESTAMPTZ,
     remarks TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -147,8 +147,8 @@ CREATE TABLE IF NOT EXISTS assets.purchase_requests (
 -- PR ITEMS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.pr_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    pr_id UUID NOT NULL REFERENCES assets.purchase_requests(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    pr_id BIGINT NOT NULL REFERENCES assets.purchase_requests(id) ON DELETE CASCADE,
     item_code VARCHAR(50),
     item_name VARCHAR(500) NOT NULL,
     description TEXT,

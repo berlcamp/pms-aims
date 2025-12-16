@@ -6,12 +6,12 @@
 -- PURCHASE ORDERS (PO)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.purchase_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     po_number VARCHAR(50) UNIQUE NOT NULL,
-    pr_id UUID NOT NULL REFERENCES assets.purchase_requests(id) ON DELETE RESTRICT,
-    supplier_id UUID NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
-    division_id UUID NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
-    school_id UUID REFERENCES assets.schools(id) ON DELETE RESTRICT,
+    pr_id BIGINT NOT NULL REFERENCES assets.purchase_requests(id) ON DELETE RESTRICT,
+    supplier_id BIGINT NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
+    division_id BIGINT NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
+    school_id BIGINT REFERENCES assets.schools(id) ON DELETE RESTRICT,
     total_amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
     delivery_address TEXT NOT NULL,
     delivery_terms TEXT,
@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS assets.purchase_orders (
         'approved', 'rejected', 'cancelled', 'amended'
     )),
     current_approval_stage INTEGER NOT NULL DEFAULT 0,
-    approved_by UUID REFERENCES assets.users(id),
+    approved_by BIGINT REFERENCES assets.users(id),
     approved_at TIMESTAMPTZ,
     remarks TEXT,
-    parent_po_id UUID REFERENCES assets.purchase_orders(id) ON DELETE SET NULL,
+    parent_po_id BIGINT REFERENCES assets.purchase_orders(id) ON DELETE SET NULL,
     amendment_number INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -35,9 +35,9 @@ CREATE TABLE IF NOT EXISTS assets.purchase_orders (
 -- PO ITEMS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.po_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    po_id UUID NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE CASCADE,
-    pr_item_id UUID REFERENCES assets.pr_items(id) ON DELETE SET NULL,
+    id BIGSERIAL PRIMARY KEY,
+    po_id BIGINT NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE CASCADE,
+    pr_item_id BIGINT REFERENCES assets.pr_items(id) ON DELETE SET NULL,
     item_name VARCHAR(500) NOT NULL,
     description TEXT,
     specification TEXT,
@@ -54,14 +54,14 @@ CREATE TABLE IF NOT EXISTS assets.po_items (
 -- PO AMENDMENTS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.po_amendments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    po_id UUID NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    po_id BIGINT NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE CASCADE,
     amendment_number INTEGER NOT NULL,
     reason TEXT NOT NULL,
     changes JSONB NOT NULL,
-    requested_by UUID NOT NULL REFERENCES assets.users(id),
+    requested_by BIGINT NOT NULL REFERENCES assets.users(id),
     requested_at TIMESTAMPTZ DEFAULT NOW(),
-    approved_by UUID REFERENCES assets.users(id),
+    approved_by BIGINT REFERENCES assets.users(id),
     approved_at TIMESTAMPTZ,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -72,12 +72,12 @@ CREATE TABLE IF NOT EXISTS assets.po_amendments (
 -- DELIVERY RECEIPTS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.delivery_receipts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     dr_number VARCHAR(50) UNIQUE NOT NULL,
-    po_id UUID NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE RESTRICT,
-    supplier_id UUID NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
+    po_id BIGINT NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE RESTRICT,
+    supplier_id BIGINT NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
     delivery_date DATE NOT NULL,
-    received_by UUID REFERENCES assets.users(id),
+    received_by BIGINT REFERENCES assets.users(id),
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN (
         'pending', 'partial', 'complete', 'overdue', 'cancelled'
     )),
@@ -91,9 +91,9 @@ CREATE TABLE IF NOT EXISTS assets.delivery_receipts (
 -- DELIVERY ITEMS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.delivery_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    dr_id UUID NOT NULL REFERENCES assets.delivery_receipts(id) ON DELETE CASCADE,
-    po_item_id UUID NOT NULL REFERENCES assets.po_items(id) ON DELETE RESTRICT,
+    id BIGSERIAL PRIMARY KEY,
+    dr_id BIGINT NOT NULL REFERENCES assets.delivery_receipts(id) ON DELETE CASCADE,
+    po_item_id BIGINT NOT NULL REFERENCES assets.po_items(id) ON DELETE RESTRICT,
     quantity_delivered NUMERIC(10, 2) NOT NULL,
     quantity_accepted NUMERIC(10, 2),
     quantity_rejected NUMERIC(10, 2),
@@ -106,11 +106,11 @@ CREATE TABLE IF NOT EXISTS assets.delivery_items (
 -- INSPECTION & ACCEPTANCE REPORTS (IAR)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.inspection_acceptance_reports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     iar_number VARCHAR(50) UNIQUE NOT NULL,
-    dr_id UUID NOT NULL REFERENCES assets.delivery_receipts(id) ON DELETE RESTRICT,
-    po_id UUID NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE RESTRICT,
-    inspected_by UUID REFERENCES assets.users(id),
+    dr_id BIGINT NOT NULL REFERENCES assets.delivery_receipts(id) ON DELETE RESTRICT,
+    po_id BIGINT NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE RESTRICT,
+    inspected_by BIGINT REFERENCES assets.users(id),
     inspection_date DATE,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN (
         'pending', 'under_inspection', 'accepted', 'partially_accepted', 'rejected', 'cancelled'
@@ -126,9 +126,9 @@ CREATE TABLE IF NOT EXISTS assets.inspection_acceptance_reports (
 -- IAR ITEMS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.iar_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    iar_id UUID NOT NULL REFERENCES assets.inspection_acceptance_reports(id) ON DELETE CASCADE,
-    delivery_item_id UUID NOT NULL REFERENCES assets.delivery_items(id) ON DELETE RESTRICT,
+    id BIGSERIAL PRIMARY KEY,
+    iar_id BIGINT NOT NULL REFERENCES assets.inspection_acceptance_reports(id) ON DELETE CASCADE,
+    delivery_item_id BIGINT NOT NULL REFERENCES assets.delivery_items(id) ON DELETE RESTRICT,
     quantity_accepted NUMERIC(10, 2) NOT NULL DEFAULT 0,
     quantity_rejected NUMERIC(10, 2) NOT NULL DEFAULT 0,
     rejection_reason TEXT,
@@ -141,9 +141,9 @@ CREATE TABLE IF NOT EXISTS assets.iar_items (
 -- PROCUREMENT PAYMENTS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.procurement_payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    po_id UUID NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE RESTRICT,
-    iar_id UUID REFERENCES assets.inspection_acceptance_reports(id) ON DELETE SET NULL,
+    id BIGSERIAL PRIMARY KEY,
+    po_id BIGINT NOT NULL REFERENCES assets.purchase_orders(id) ON DELETE RESTRICT,
+    iar_id BIGINT REFERENCES assets.inspection_acceptance_reports(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN (
         'pending', 'obr_attached', 'dv_attached', 'forwarded_to_accounting', 'paid', 'cancelled'
     )),
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS assets.procurement_payments (
     dv_number VARCHAR(100),
     dv_document_url TEXT,
     forwarded_to_accounting_at TIMESTAMPTZ,
-    forwarded_by UUID REFERENCES assets.users(id),
+    forwarded_by BIGINT REFERENCES assets.users(id),
     payment_date DATE,
     payment_reference VARCHAR(255),
     remarks TEXT,

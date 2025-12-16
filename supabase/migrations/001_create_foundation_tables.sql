@@ -2,6 +2,9 @@
 -- Description: Creates core foundation tables for multi-tenant structure, users, roles, and permissions
 -- Schema: assets
 
+-- Create schema if it doesn't exist
+CREATE SCHEMA IF NOT EXISTS assets;
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -9,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- DIVISIONS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.divisions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     code VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     region VARCHAR(100),
@@ -24,8 +27,8 @@ CREATE TABLE IF NOT EXISTS assets.divisions (
 -- SCHOOLS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.schools (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    division_id UUID NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
+    id BIGSERIAL PRIMARY KEY,
+    division_id BIGINT NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
     code VARCHAR(50) NOT NULL,
     name VARCHAR(255) NOT NULL,
     school_id VARCHAR(50), -- DepEd School ID
@@ -41,7 +44,7 @@ CREATE TABLE IF NOT EXISTS assets.schools (
 -- ROLES TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     code VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -55,7 +58,7 @@ CREATE TABLE IF NOT EXISTS assets.roles (
 -- PERMISSIONS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.permissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     code VARCHAR(100) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -69,9 +72,9 @@ CREATE TABLE IF NOT EXISTS assets.permissions (
 -- ROLE PERMISSIONS (Junction Table)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.role_permissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    role_id UUID NOT NULL REFERENCES assets.roles(id) ON DELETE CASCADE,
-    permission_id UUID NOT NULL REFERENCES assets.permissions(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    role_id BIGINT NOT NULL REFERENCES assets.roles(id) ON DELETE CASCADE,
+    permission_id BIGINT NOT NULL REFERENCES assets.permissions(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(role_id, permission_id)
 );
@@ -80,10 +83,10 @@ CREATE TABLE IF NOT EXISTS assets.role_permissions (
 -- USERS TABLE (Extends Supabase Auth)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     user_id UUID UNIQUE NOT NULL, -- Supabase Auth user ID
-    division_id UUID REFERENCES assets.divisions(id) ON DELETE SET NULL,
-    school_id UUID REFERENCES assets.schools(id) ON DELETE SET NULL,
+    division_id BIGINT REFERENCES assets.divisions(id) ON DELETE SET NULL,
+    school_id BIGINT REFERENCES assets.schools(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(20),
@@ -104,13 +107,13 @@ CREATE TABLE IF NOT EXISTS assets.users (
 -- USER ROLES (Junction Table)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.user_roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES assets.users(id) ON DELETE CASCADE,
-    role_id UUID NOT NULL REFERENCES assets.roles(id) ON DELETE CASCADE,
-    division_id UUID REFERENCES assets.divisions(id) ON DELETE CASCADE,
-    school_id UUID REFERENCES assets.schools(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES assets.users(id) ON DELETE CASCADE,
+    role_id BIGINT NOT NULL REFERENCES assets.roles(id) ON DELETE CASCADE,
+    division_id BIGINT REFERENCES assets.divisions(id) ON DELETE CASCADE,
+    school_id BIGINT REFERENCES assets.schools(id) ON DELETE CASCADE,
     assigned_at TIMESTAMPTZ DEFAULT NOW(),
-    assigned_by UUID REFERENCES assets.users(id),
+    assigned_by BIGINT REFERENCES assets.users(id),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, role_id, division_id, school_id)

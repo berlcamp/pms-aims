@@ -6,14 +6,14 @@
 -- AUDIT LOGS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES assets.users(id) ON DELETE SET NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES assets.users(id) ON DELETE SET NULL,
     action_type VARCHAR(50) NOT NULL CHECK (action_type IN (
         'create', 'update', 'delete', 'approve', 'reject', 'return', 
         'forward', 'cancel', 'print', 'export', 'login', 'logout'
     )),
     entity_type VARCHAR(100) NOT NULL,
-    entity_id UUID NOT NULL,
+    entity_id BIGINT NOT NULL,
     old_value JSONB,
     new_value JSONB,
     changes JSONB, -- Structured changes: {"field": {"old": value, "new": value}}
@@ -36,18 +36,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type_created_at ON assets.audit
 -- AUDIT LOGGING FUNCTION
 -- ============================================================================
 CREATE OR REPLACE FUNCTION assets.log_audit(
-    p_user_id UUID,
+    p_user_id BIGINT,
     p_action_type VARCHAR,
     p_entity_type VARCHAR,
-    p_entity_id UUID,
+    p_entity_id BIGINT,
     p_old_value JSONB DEFAULT NULL,
     p_new_value JSONB DEFAULT NULL,
     p_changes JSONB DEFAULT NULL,
     p_remarks TEXT DEFAULT NULL
 )
-RETURNS UUID AS $$
+RETURNS BIGINT AS $$
 DECLARE
-    v_audit_id UUID;
+    v_audit_id BIGINT;
 BEGIN
     INSERT INTO assets.audit_logs (
         user_id,
@@ -79,14 +79,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION assets.create_audit_trigger()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_user_id UUID;
+    v_user_id BIGINT;
     v_changes JSONB := '{}'::JSONB;
     v_key TEXT;
 BEGIN
     -- Get current user ID from JWT or session
     -- For now, we'll use a function to get it from auth context
     -- In production, this should be set via application context
-    v_user_id := current_setting('app.current_user_id', true)::UUID;
+    v_user_id := current_setting('app.current_user_id', true)::BIGINT;
     
     -- If no user_id in context, try to get from auth.users
     IF v_user_id IS NULL THEN
@@ -159,7 +159,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 -- HELPER FUNCTION TO SET CURRENT USER CONTEXT
 -- ============================================================================
-CREATE OR REPLACE FUNCTION assets.set_current_user(p_user_id UUID)
+CREATE OR REPLACE FUNCTION assets.set_current_user(p_user_id BIGINT)
 RETURNS VOID AS $$
 BEGIN
     PERFORM set_config('app.current_user_id', p_user_id::TEXT, false);
@@ -171,27 +171,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 ALTER TABLE assets.audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can view audit logs for entities they have access to
-CREATE POLICY "Users can view audit logs"
-    ON assets.audit_logs
-    FOR SELECT
-    USING (
-        -- Users can see audit logs for their own actions
-        user_id IN (
-            SELECT id FROM assets.users WHERE user_id = auth.uid()
-        )
-        OR
-        -- Or if they have system admin permissions (to be defined)
-        EXISTS (
-            SELECT 1 FROM assets.user_roles ur
-            JOIN assets.roles r ON ur.role_id = r.id
-            WHERE ur.user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-            AND r.code = 'SDS'
-        )
-    );
-
--- Policy: Only system can insert audit logs (via triggers)
-CREATE POLICY "System can insert audit logs"
-    ON assets.audit_logs
-    FOR INSERT
-    WITH CHECK (true); -- Triggers run with SECURITY DEFINER
+-- Note: RLS policies for audit_logs are created in migration 007

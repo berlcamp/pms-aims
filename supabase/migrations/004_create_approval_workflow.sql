@@ -6,16 +6,16 @@
 -- APPROVAL WORKFLOWS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.approval_workflows (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     entity_type VARCHAR(100) NOT NULL,
-    entity_id UUID NOT NULL,
+    entity_id BIGINT NOT NULL,
     workflow_type VARCHAR(100) NOT NULL,
     current_stage INTEGER NOT NULL DEFAULT 1,
     total_stages INTEGER NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN (
         'pending', 'approved', 'rejected', 'returned', 'cancelled'
     )),
-    initiated_by UUID NOT NULL REFERENCES assets.users(id),
+    initiated_by BIGINT NOT NULL REFERENCES assets.users(id),
     initiated_at TIMESTAMPTZ DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -27,17 +27,17 @@ CREATE TABLE IF NOT EXISTS assets.approval_workflows (
 -- APPROVAL STEPS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.approval_steps (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workflow_id UUID NOT NULL REFERENCES assets.approval_workflows(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    workflow_id BIGINT NOT NULL REFERENCES assets.approval_workflows(id) ON DELETE CASCADE,
     step_number INTEGER NOT NULL,
     role_code VARCHAR(50) NOT NULL,
-    user_id UUID REFERENCES assets.users(id) ON DELETE SET NULL,
+    user_id BIGINT REFERENCES assets.users(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN (
         'pending', 'approved', 'rejected', 'returned', 'cancelled'
     )),
     action VARCHAR(50) CHECK (action IN ('approve', 'reject', 'return', 'forward', 'cancel')),
     remarks TEXT,
-    acted_by UUID REFERENCES assets.users(id),
+    acted_by BIGINT REFERENCES assets.users(id),
     acted_at TIMESTAMPTZ,
     due_date TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -49,12 +49,12 @@ CREATE TABLE IF NOT EXISTS assets.approval_steps (
 -- APPROVAL ACTION LOGS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.approval_action_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    step_id UUID NOT NULL REFERENCES assets.approval_steps(id) ON DELETE CASCADE,
-    workflow_id UUID NOT NULL REFERENCES assets.approval_workflows(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    step_id BIGINT NOT NULL REFERENCES assets.approval_steps(id) ON DELETE CASCADE,
+    workflow_id BIGINT NOT NULL REFERENCES assets.approval_workflows(id) ON DELETE CASCADE,
     action VARCHAR(50) NOT NULL CHECK (action IN ('approve', 'reject', 'return', 'forward', 'cancel')),
     remarks TEXT NOT NULL,
-    acted_by UUID NOT NULL REFERENCES assets.users(id),
+    acted_by BIGINT NOT NULL REFERENCES assets.users(id),
     acted_at TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -91,12 +91,12 @@ CREATE TRIGGER update_steps_updated_at
 -- ============================================================================
 
 -- Function to get next pending step for a workflow
-CREATE OR REPLACE FUNCTION assets.get_next_pending_step(p_workflow_id UUID)
+CREATE OR REPLACE FUNCTION assets.get_next_pending_step(p_workflow_id BIGINT)
 RETURNS TABLE (
-    step_id UUID,
+    step_id BIGINT,
     step_number INTEGER,
     role_code VARCHAR,
-    user_id UUID
+    user_id BIGINT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -115,8 +115,8 @@ $$ LANGUAGE plpgsql;
 
 -- Function to check if user can act on a workflow step
 CREATE OR REPLACE FUNCTION assets.can_user_act_on_step(
-    p_user_id UUID,
-    p_step_id UUID
+    p_user_id BIGINT,
+    p_step_id BIGINT
 )
 RETURNS BOOLEAN AS $$
 DECLARE

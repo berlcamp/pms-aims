@@ -24,9 +24,9 @@ CREATE INDEX IF NOT EXISTS idx_iar_po_status ON assets.inspection_acceptance_rep
 -- DOCUMENT MANAGEMENT TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.procurement_documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     entity_type VARCHAR(100) NOT NULL,
-    entity_id UUID NOT NULL,
+    entity_id BIGINT NOT NULL,
     document_type VARCHAR(50) NOT NULL CHECK (document_type IN (
         'ppmp', 'app', 'pr', 'po', 'quotation', 'canvass', 
         'delivery_receipt', 'iar', 'obr', 'dv', 'other'
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS assets.procurement_documents (
     file_size BIGINT,
     mime_type VARCHAR(100),
     version INTEGER DEFAULT 1,
-    uploaded_by UUID NOT NULL REFERENCES assets.users(id),
+    uploaded_by BIGINT NOT NULL REFERENCES assets.users(id),
     uploaded_at TIMESTAMPTZ DEFAULT NOW(),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -50,8 +50,8 @@ CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON assets.procurement_docum
 -- NOTIFICATIONS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES assets.users(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES assets.users(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL CHECK (type IN (
         'approval_request', 'approval_approved', 'approval_rejected', 'approval_returned',
         'delivery_received', 'inspection_completed', 'payment_forwarded', 'system_alert'
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS assets.notifications (
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     entity_type VARCHAR(100),
-    entity_id UUID,
+    entity_id BIGINT,
     is_read BOOLEAN DEFAULT false,
     read_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -102,10 +102,10 @@ ALTER TABLE assets.notifications ENABLE ROW LEVEL SECURITY;
 -- ============================================================================
 -- HELPER FUNCTION: Get user's division/school IDs
 -- ============================================================================
-CREATE OR REPLACE FUNCTION assets.get_user_tenant_ids(p_user_id UUID)
+CREATE OR REPLACE FUNCTION assets.get_user_tenant_ids(p_user_id BIGINT)
 RETURNS TABLE (
-    division_id UUID,
-    school_id UUID
+    division_id BIGINT,
+    school_id BIGINT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -123,14 +123,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- HELPER FUNCTION: Check if user can access division/school
 -- ============================================================================
 CREATE OR REPLACE FUNCTION assets.can_user_access_tenant(
-    p_user_id UUID,
-    p_division_id UUID,
-    p_school_id UUID DEFAULT NULL
+    p_user_id BIGINT,
+    p_division_id BIGINT,
+    p_school_id BIGINT DEFAULT NULL
 )
 RETURNS BOOLEAN AS $$
 DECLARE
-    v_user_division_id UUID;
-    v_user_school_id UUID;
+    v_user_division_id BIGINT;
+    v_user_school_id BIGINT;
     v_is_sds BOOLEAN;
 BEGIN
     -- Get user's tenant IDs
@@ -170,190 +170,209 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- RLS POLICIES: DIVISIONS
+-- RLS POLICIES: Simple policies for authenticated users
 -- ============================================================================
-CREATE POLICY "Users can view divisions"
-    ON assets.divisions FOR SELECT
-    USING (true); -- All authenticated users can view divisions
 
-CREATE POLICY "SDS can manage divisions"
+-- Drop all existing policies (if any)
+DO $$ 
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT schemaname, tablename, policyname 
+              FROM pg_policies 
+              WHERE schemaname = 'assets') 
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', 
+                       r.policyname, r.schemaname, r.tablename);
+    END LOOP;
+END $$;
+
+-- Create one policy per table allowing ALL operations for authenticated users
+CREATE POLICY "Authenticated users can access divisions"
     ON assets.divisions FOR ALL
-    USING (
-        EXISTS (
-            SELECT 1 FROM assets.user_roles ur
-            JOIN assets.roles r ON ur.role_id = r.id
-            WHERE ur.user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-            AND r.code = 'SDS'
-            AND ur.is_active = true
-        )
-    );
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
--- ============================================================================
--- RLS POLICIES: SCHOOLS
--- ============================================================================
-CREATE POLICY "Users can view schools in their division"
-    ON assets.schools FOR SELECT
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        EXISTS (
-            SELECT 1 FROM assets.user_roles ur
-            JOIN assets.roles r ON ur.role_id = r.id
-            WHERE ur.user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-            AND r.code = 'SDS'
-        )
-    );
-
-CREATE POLICY "Users can manage schools in their division"
+CREATE POLICY "Authenticated users can access schools"
     ON assets.schools FOR ALL
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        EXISTS (
-            SELECT 1 FROM assets.user_roles ur
-            JOIN assets.roles r ON ur.role_id = r.id
-            WHERE ur.user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-            AND r.code IN ('SDS', 'SUPPLY_OFFICER_DIV')
-        )
-    );
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
--- ============================================================================
--- RLS POLICIES: USERS
--- ============================================================================
-CREATE POLICY "Users can view users in their tenant"
-    ON assets.users FOR SELECT
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-        OR
-        EXISTS (
-            SELECT 1 FROM assets.user_roles ur
-            JOIN assets.roles r ON ur.role_id = r.id
-            WHERE ur.user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-            AND r.code = 'SDS'
-        )
-    );
+CREATE POLICY "Authenticated users can access roles"
+    ON assets.roles FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
--- ============================================================================
--- RLS POLICIES: PROCUREMENT PROPOSALS
--- ============================================================================
-CREATE POLICY "Users can view proposals in their tenant"
-    ON assets.procurement_proposals FOR SELECT
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-    );
+CREATE POLICY "Authenticated users can access permissions"
+    ON assets.permissions FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
-CREATE POLICY "Users can manage proposals in their tenant"
+CREATE POLICY "Authenticated users can access users"
+    ON assets.users FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access user_roles"
+    ON assets.user_roles FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access role_permissions"
+    ON assets.role_permissions FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access procurement_proposals"
     ON assets.procurement_proposals FOR ALL
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-    );
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
--- ============================================================================
--- RLS POLICIES: PURCHASE REQUESTS
--- ============================================================================
-CREATE POLICY "Users can view PRs in their tenant"
-    ON assets.purchase_requests FOR SELECT
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-    );
+CREATE POLICY "Authenticated users can access proposal_items"
+    ON assets.proposal_items FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
-CREATE POLICY "Users can manage PRs in their tenant"
+CREATE POLICY "Authenticated users can access pre_procurement_evaluations"
+    ON assets.pre_procurement_evaluations FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access purchase_requests"
     ON assets.purchase_requests FOR ALL
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-    );
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
--- ============================================================================
--- RLS POLICIES: PURCHASE ORDERS
--- ============================================================================
-CREATE POLICY "Users can view POs in their tenant"
-    ON assets.purchase_orders FOR SELECT
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-    );
+CREATE POLICY "Authenticated users can access pr_items"
+    ON assets.pr_items FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
-CREATE POLICY "Users can manage POs in their tenant"
+CREATE POLICY "Authenticated users can access purchase_orders"
     ON assets.purchase_orders FOR ALL
-    USING (
-        division_id IN (
-            SELECT division_id FROM assets.users 
-            WHERE user_id = auth.uid() AND division_id IS NOT NULL
-        )
-        OR
-        school_id IN (
-            SELECT school_id FROM assets.users 
-            WHERE user_id = auth.uid() AND school_id IS NOT NULL
-        )
-    );
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
--- ============================================================================
--- RLS POLICIES: NOTIFICATIONS
--- ============================================================================
-CREATE POLICY "Users can view their own notifications"
-    ON assets.notifications FOR SELECT
-    USING (
-        user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-    );
+CREATE POLICY "Authenticated users can access po_items"
+    ON assets.po_items FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
-CREATE POLICY "Users can update their own notifications"
-    ON assets.notifications FOR UPDATE
-    USING (
-        user_id IN (SELECT id FROM assets.users WHERE user_id = auth.uid())
-    );
+CREATE POLICY "Authenticated users can access po_amendments"
+    ON assets.po_amendments FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access suppliers"
+    ON assets.suppliers FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access supplier_quotations"
+    ON assets.supplier_quotations FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access quotation_items"
+    ON assets.quotation_items FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access canvasses"
+    ON assets.canvasses FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access canvass_suppliers"
+    ON assets.canvass_suppliers FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access delivery_receipts"
+    ON assets.delivery_receipts FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access delivery_items"
+    ON assets.delivery_items FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access inspection_acceptance_reports"
+    ON assets.inspection_acceptance_reports FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access iar_items"
+    ON assets.iar_items FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access procurement_payments"
+    ON assets.procurement_payments FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access approval_workflows"
+    ON assets.approval_workflows FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access approval_steps"
+    ON assets.approval_steps FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access approval_action_logs"
+    ON assets.approval_action_logs FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access procurement_documents"
+    ON assets.procurement_documents FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access notifications"
+    ON assets.notifications FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access audit_logs"
+    ON assets.audit_logs FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
 
 -- ============================================================================
 -- NUMBERING SEQUENCE FUNCTIONS

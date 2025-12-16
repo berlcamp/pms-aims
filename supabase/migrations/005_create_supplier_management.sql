@@ -6,7 +6,7 @@
 -- SUPPLIERS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     code VARCHAR(50),
     name VARCHAR(255) NOT NULL,
     tin VARCHAR(50), -- Tax Identification Number
@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS assets.suppliers (
 -- SUPPLIER QUOTATIONS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.supplier_quotations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    supplier_id UUID NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
-    canvass_id UUID, -- Will reference canvasses table (created later)
+    id BIGSERIAL PRIMARY KEY,
+    supplier_id BIGINT NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
+    canvass_id BIGINT, -- Will reference canvasses table (created later)
     quotation_number VARCHAR(100),
     quotation_date DATE NOT NULL,
     valid_until DATE,
@@ -49,8 +49,8 @@ CREATE TABLE IF NOT EXISTS assets.supplier_quotations (
 -- QUOTATION ITEMS
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.quotation_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    quotation_id UUID NOT NULL REFERENCES assets.supplier_quotations(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    quotation_id BIGINT NOT NULL REFERENCES assets.supplier_quotations(id) ON DELETE CASCADE,
     item_name VARCHAR(500) NOT NULL,
     description TEXT,
     unit VARCHAR(50) NOT NULL,
@@ -66,19 +66,19 @@ CREATE TABLE IF NOT EXISTS assets.quotation_items (
 -- CANVASSES
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.canvasses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id BIGSERIAL PRIMARY KEY,
     canvass_number VARCHAR(50) UNIQUE NOT NULL,
-    pr_id UUID NOT NULL, -- Will reference purchase_requests (created in 003)
-    division_id UUID NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
-    school_id UUID REFERENCES assets.schools(id) ON DELETE RESTRICT,
+    pr_id BIGINT NOT NULL, -- Will reference purchase_requests (created in 003)
+    division_id BIGINT NOT NULL REFERENCES assets.divisions(id) ON DELETE RESTRICT,
+    school_id BIGINT REFERENCES assets.schools(id) ON DELETE RESTRICT,
     status VARCHAR(50) NOT NULL DEFAULT 'draft' CHECK (status IN (
         'draft', 'sent', 'quotation_received', 'under_evaluation', 'completed', 'cancelled'
     )),
     sent_date DATE,
     deadline_date DATE,
-    evaluated_by UUID REFERENCES assets.users(id),
+    evaluated_by BIGINT REFERENCES assets.users(id),
     evaluated_at TIMESTAMPTZ,
-    recommended_supplier_id UUID REFERENCES assets.suppliers(id),
+    recommended_supplier_id BIGINT REFERENCES assets.suppliers(id),
     recommendation_remarks TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -88,10 +88,10 @@ CREATE TABLE IF NOT EXISTS assets.canvasses (
 -- CANVASS SUPPLIERS (Junction Table)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS assets.canvass_suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    canvass_id UUID NOT NULL REFERENCES assets.canvasses(id) ON DELETE CASCADE,
-    supplier_id UUID NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
-    quotation_id UUID REFERENCES assets.supplier_quotations(id) ON DELETE SET NULL,
+    id BIGSERIAL PRIMARY KEY,
+    canvass_id BIGINT NOT NULL REFERENCES assets.canvasses(id) ON DELETE CASCADE,
+    supplier_id BIGINT NOT NULL REFERENCES assets.suppliers(id) ON DELETE RESTRICT,
+    quotation_id BIGINT REFERENCES assets.supplier_quotations(id) ON DELETE SET NULL,
     is_recommended BOOLEAN DEFAULT false,
     score NUMERIC(5, 2),
     remarks TEXT,
