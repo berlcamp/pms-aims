@@ -1,6 +1,5 @@
 "use client";
 
-import { TableSkeleton } from "@/components/TableSkeleton";
 import { Button } from "@/components/ui/button";
 
 import Notfoundpage from "@/components/Notfoundpage";
@@ -17,7 +16,7 @@ export default function Page() {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [modalAddOpen, setModalAddOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Initialize to true
   const [filter, setFilter] = useState({
     keyword: "",
   });
@@ -26,13 +25,22 @@ export default function Page() {
 
   const user = useAppSelector((state) => state.user.user);
   const filterKeywordRef = useRef(filter.keyword);
+  const pageRef = useRef(page);
+
+  // Update pageRef when page changes
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
 
   // Wrapper function to reset page when filter changes
+  // Using useCallback to ensure stable reference and batch updates
   const handleFilterChange = useCallback((newFilter: { keyword: string }) => {
+    const filterChanged = filterKeywordRef.current !== newFilter.keyword;
+    filterKeywordRef.current = newFilter.keyword;
+
+    // Batch both updates together - React 18 will batch these automatically
     setFilter(newFilter);
-    // Reset to page 1 when filter keyword changes
-    if (filterKeywordRef.current !== newFilter.keyword) {
-      filterKeywordRef.current = newFilter.keyword;
+    if (filterChanged && pageRef.current !== 1) {
       setPage(1);
     }
   }, []);
@@ -40,10 +48,11 @@ export default function Page() {
   // Fetch data on page load
   useEffect(() => {
     let isMounted = true;
-    dispatch(addList([])); // Reset the list first on page load
 
     const fetchData = async () => {
       setLoading(true);
+      dispatch(addList([])); // Reset the list
+
       let query = supabase
         .from("schools")
         .select("*, divisions(id, code, name)", { count: "exact" });
@@ -78,7 +87,7 @@ export default function Page() {
     return () => {
       isMounted = false;
     };
-  }, [page, filter, dispatch]); // Add `dispatch` to dependency array
+  }, [page, filter, dispatch]);
 
   if (user?.type != "super admin") {
     return <Notfoundpage />;
@@ -115,7 +124,8 @@ export default function Page() {
       <div className="app__content">
         {/* Pass Redux data to List Table */}
         {loading ? (
-          <TableSkeleton />
+          // <TableSkeleton />
+          <div>Loading...</div>
         ) : totalCount === 0 ? (
           <div className="app__empty_state">
             <div className="app__empty_state_icon">

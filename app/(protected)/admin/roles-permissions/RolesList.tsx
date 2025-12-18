@@ -28,7 +28,7 @@ export const RolesList = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [modalAddOpen, setModalAddOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Initialize to true
   const [filter, setFilter] = useState({
     keyword: "",
   });
@@ -49,10 +49,11 @@ export const RolesList = () => {
 
   useEffect(() => {
     let isMounted = true;
-    dispatch(addList([]));
 
     const fetchData = async () => {
-      setLoading(true);
+      setLoading(true); // Set loading before clearing list
+      dispatch(addList([])); // Reset the list
+      
       let query = supabase.from(table).select("*", { count: "exact" });
 
       if (filter.keyword) {

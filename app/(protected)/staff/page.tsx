@@ -17,7 +17,7 @@ export default function Page() {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [modalAddOpen, setModalAddOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Initialize to true
   const [filter, setFilter] = useState({
     keyword: "",
   });
@@ -40,10 +40,11 @@ export default function Page() {
   // Fetch data on page load
   useEffect(() => {
     let isMounted = true;
-    dispatch(addList([])); // Reset the list first on page load
 
     const fetchData = async () => {
-      setLoading(true);
+      setLoading(true); // Set loading before clearing list
+      dispatch(addList([])); // Reset the list
+      
       let query = supabase
         .from("users")
         .select(
