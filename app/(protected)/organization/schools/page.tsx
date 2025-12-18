@@ -45,16 +45,13 @@ export default function Page() {
     const fetchData = async () => {
       setLoading(true);
       let query = supabase
-        .from("users")
-        .select(
-          "*, user_roles!user_roles_user_id_fkey(roles(id, name, code, is_active))",
-          { count: "exact" }
-        );
+        .from("schools")
+        .select("*, divisions(id, code, name)", { count: "exact" });
 
-      // Search in both name and email fields
+      // Search in both name and code fields
       if (filter.keyword) {
         query = query.or(
-          `name.ilike.%${filter.keyword}%,email.ilike.%${filter.keyword}%`
+          `name.ilike.%${filter.keyword}%,code.ilike.%${filter.keyword}%`
         );
       }
 
@@ -68,7 +65,7 @@ export default function Page() {
       if (error) {
         console.error(error);
       } else {
-        // Update the list of suppliers in Redux store
+        // Update the list of schools in Redux store
         dispatch(addList(data));
         setTotalCount(count || 0);
       }
@@ -90,7 +87,7 @@ export default function Page() {
   return (
     <div>
       <div className="app__title">
-        <h1 className="app__title_text">Staff</h1>
+        <h1 className="app__title_text">Schools</h1>
         <div className="app__title_actions">
           <Filter filter={filter} setFilter={handleFilterChange} />
           <Button
@@ -111,7 +108,7 @@ export default function Page() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Add Staff
+            Add School
           </Button>
         </div>
       </div>
@@ -132,15 +129,15 @@ export default function Page() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={1.5}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                 />
               </svg>
             </div>
-            <p className="app__empty_state_title">No staff members found</p>
+            <p className="app__empty_state_title">No schools found</p>
             <p className="app__empty_state_description">
               {filter.keyword
                 ? "Try adjusting your search criteria"
-                : "Get started by adding a new staff member"}
+                : "Get started by adding a new school"}
             </p>
           </div>
         ) : (

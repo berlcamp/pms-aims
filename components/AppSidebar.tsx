@@ -1,28 +1,33 @@
 "use client";
 
 import {
-  BarChart3,
-  ClipboardCheck,
-  FileText,
+  Bell,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Home,
   Loader2,
-  Package,
-  ShoppingCart,
+  Plus,
+  School,
+  Shield,
   User,
-  Users,
 } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-import { useAppSelector } from "@/lib/redux/hook";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,15 +35,32 @@ import NProgress from "nprogress";
 import { useEffect, useState } from "react";
 
 export function AppSidebar() {
-  const user = useAppSelector((state) => state.user.user);
   const pathname = usePathname();
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
+
+  // Check if we're on an organization submenu page
+  const isOnOrganizationPage =
+    pathname?.startsWith("/organization/schools") ||
+    pathname?.startsWith("/organization/division-offices");
+
+  // Initialize organization submenu as open if on organization pages, otherwise closed
+  const [isOrganizationOpen, setIsOrganizationOpen] = useState(
+    isOnOrganizationPage || false
+  );
 
   // Reset loading state when pathname changes
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingPath(null);
   }, [pathname]);
+
+  // Auto-expand Organization submenu if on Schools or Division Offices pages
+  useEffect(() => {
+    if (isOnOrganizationPage && !isOrganizationOpen) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setIsOrganizationOpen(true);
+    }
+  }, [isOnOrganizationPage]);
 
   const handleLinkClick = (url: string) => {
     // Don't trigger if already on this page
@@ -49,72 +71,75 @@ export function AppSidebar() {
     setLoadingPath(url);
   };
 
-  // Menu items.
-  const allItems = [
+  // Navigation items
+  const navItems = [
     {
       title: "Home",
       url: "/home",
       icon: Home,
     },
     {
-      title: "Procurement Planning",
-      url: "/procurement/planning",
-      icon: FileText,
+      title: "My tasks",
+      url: "/tasks",
+      icon: CheckCircle2,
     },
     {
-      title: "Purchase Requests",
-      url: "/procurement/pr",
-      icon: ShoppingCart,
-    },
-    {
-      title: "Purchase Orders",
-      url: "/procurement/po",
-      icon: Package,
-    },
-    {
-      title: "Suppliers",
-      url: "/procurement/suppliers",
-      icon: Users,
-    },
-    {
-      title: "Evaluation",
-      url: "/procurement/evaluation",
-      icon: ClipboardCheck,
-    },
-    {
-      title: "Reports",
-      url: "/procurement/reports",
-      icon: BarChart3,
+      title: "Inbox",
+      url: "/inbox",
+      icon: Bell,
     },
   ];
 
-  // Filter items for cashier users - only show Home and Retail Transactions
-  const items =
-    user?.type === "cashier"
-      ? allItems.filter((item) => item.url === "/home")
-      : allItems;
-
-  const allSettingItems = [
+  // Projects (sample data - you can replace this with dynamic data)
+  const projects = [
     {
-      title: "Staff",
+      title: "Sample",
+      url: "/projects/sample",
+      color: "#d8a7f0", // Light purple color
+    },
+  ];
+
+  // Settings items
+  const settingItems = [
+    {
+      title: "User Accounts",
       url: "/staff",
       icon: User,
     },
+    {
+      title: "Roles & Permissions",
+      url: "/admin/roles-permissions",
+      icon: Shield,
+    },
   ];
 
-  // Filter items for cashier users - only show Home and Retail Transactions
-  const settingItems =
-    user?.type !== "super admin"
-      ? allSettingItems.filter((item) => item.url !== "/branches")
-      : allSettingItems;
+  // Organization submenu items
+  const organizationSubItems = [
+    {
+      title: "Schools",
+      url: "/organization/schools",
+      icon: School,
+    },
+    {
+      title: "Division Offices",
+      url: "/organization/division-offices",
+      icon: Building2,
+    },
+  ];
+
+  // Check if any organization submenu item is active
+  const isOrganizationSubItemActive = organizationSubItems.some(
+    (item) => pathname === item.url
+  );
 
   return (
-    <Sidebar className="pt-13 border-r border-border/40">
-      <SidebarContent className="bg-gradient-to-b from-background via-background to-muted/20 backdrop-blur-sm">
+    <Sidebar className="pt-11 border-r border-gray-700/50">
+      <SidebarContent className="bg-[#282828]">
+        {/* Navigation Section */}
         <SidebarGroup className="px-2 py-4">
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {items.map((item) => {
+              {navItems.map((item) => {
                 const isActive = pathname === item.url;
                 const isLoading = loadingPath === item.url;
                 return (
@@ -124,45 +149,28 @@ export function AppSidebar() {
                         href={item.url}
                         onClick={() => handleLinkClick(item.url)}
                         className={cn(
-                          "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-out",
-                          "hover:bg-accent/50 hover:shadow-sm",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          "hover:!bg-[#383838]",
+                          "focus-visible:outline-none",
                           isLoading && "opacity-60 cursor-wait",
                           isActive
-                            ? "bg-accent text-accent-foreground shadow-sm font-medium"
-                            : "text-muted-foreground hover:text-foreground"
+                            ? "bg-[#383838] text-white"
+                            : "text-white/90 hover:text-white"
                         )}
                       >
-                        {/* Active indicator bar */}
-                        {isActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                        ) : (
+                          <item.icon
+                            className={cn(
+                              "h-4 w-4 transition-colors duration-200",
+                              isActive
+                                ? "text-white"
+                                : "text-white/70 group-hover:text-white"
+                            )}
+                          />
                         )}
-
-                        <div
-                          className={cn(
-                            "flex items-center justify-center transition-transform duration-200",
-                            isActive && "scale-110"
-                          )}
-                        >
-                          {isLoading ? (
-                            <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                          ) : (
-                            <item.icon
-                              className={cn(
-                                "h-4 w-4 transition-colors duration-200",
-                                isActive
-                                  ? "text-primary"
-                                  : "text-muted-foreground group-hover:text-foreground"
-                              )}
-                            />
-                          )}
-                        </div>
-                        <span
-                          className={cn(
-                            "text-sm transition-colors duration-200",
-                            isActive && "font-semibold"
-                          )}
-                        >
+                        <span className="text-sm transition-colors duration-200">
                           {item.title}
                         </span>
                       </Link>
@@ -174,76 +182,175 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Projects Section */}
+        <SidebarGroup className="px-2 py-4 relative">
+          <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white uppercase tracking-wider">
+            Projects
+          </SidebarGroupLabel>
+          <SidebarGroupAction
+            className="text-white hover:!bg-[#383838] hover:text-white"
+            aria-label="Add project"
+          >
+            <Plus className="h-4 w-4" />
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {projects.map((project) => {
+                const isActive = pathname === project.url;
+                const isLoading = loadingPath === project.url;
+                return (
+                  <SidebarMenuItem key={project.title}>
+                    <SidebarMenuButton asChild>
+                      <Link
+                        href={project.url}
+                        onClick={() => handleLinkClick(project.url)}
+                        className={cn(
+                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          "hover:!bg-[#383838]",
+                          "focus-visible:outline-none",
+                          isLoading && "opacity-60 cursor-wait",
+                          isActive
+                            ? "bg-[#383838] text-white"
+                            : "text-white/90 hover:text-white"
+                        )}
+                      >
+                        <div
+                          className="h-3 w-3 rounded-sm flex-shrink-0"
+                          style={{ backgroundColor: project.color }}
+                        />
+                        <span className="text-sm transition-colors duration-200">
+                          {project.title}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Settings Section */}
         <SidebarGroup className="px-2 py-4">
-          <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
+          <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white/70 uppercase tracking-wider">
             Settings
           </SidebarGroupLabel>
           <SidebarGroupContent className="pb-0">
             <SidebarMenu className="space-y-1">
-              {settingItems
-                .filter((item) => {
-                  // Only show branches for super admin
-                  if (item.url === "/branches") {
-                    return user?.type === "super admin";
-                  }
-                  return true;
-                })
-                .map((item) => {
-                  const isActive = pathname === item.url;
-                  const isLoading = loadingPath === item.url;
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild>
-                        <Link
-                          href={item.url}
-                          onClick={() => handleLinkClick(item.url)}
-                          className={cn(
-                            "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-out",
-                            "hover:bg-accent/50 hover:shadow-sm",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                            isLoading && "opacity-60 cursor-wait",
-                            isActive
-                              ? "bg-accent text-accent-foreground shadow-sm font-medium"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {/* Active indicator bar */}
-                          {isActive && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
-                          )}
+              {/* Organization Menu Item with Submenu */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setIsOrganizationOpen(!isOrganizationOpen)}
+                  className={cn(
+                    "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                    "hover:!bg-[#383838]",
+                    "focus-visible:outline-none",
+                    isOrganizationSubItemActive || isOrganizationOpen
+                      ? "bg-[#383838] text-white"
+                      : "text-white/90 hover:text-white"
+                  )}
+                >
+                  <Building2
+                    className={cn(
+                      "h-4 w-4 transition-colors duration-200",
+                      isOrganizationSubItemActive || isOrganizationOpen
+                        ? "text-white"
+                        : "text-white/70 group-hover:text-white"
+                    )}
+                  />
+                  <span className="text-sm transition-colors duration-200 flex-1">
+                    Organization
+                  </span>
+                  {isOrganizationOpen ? (
+                    <ChevronDown className="h-4 w-4 text-white/70 group-hover:text-white transition-transform duration-200" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-white/70 group-hover:text-white transition-transform duration-200" />
+                  )}
+                </SidebarMenuButton>
+                {isOrganizationOpen && (
+                  <SidebarMenuSub>
+                    {organizationSubItems.map((subItem) => {
+                      const isSubActive = pathname === subItem.url;
+                      const isSubLoading = loadingPath === subItem.url;
+                      return (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton asChild isActive={isSubActive}>
+                            <Link
+                              href={subItem.url}
+                              onClick={() => handleLinkClick(subItem.url)}
+                              className={cn(
+                                "group flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-200",
+                                "hover:!bg-[#383838]",
+                                "focus-visible:outline-none",
+                                isSubLoading && "opacity-60 cursor-wait",
+                                isSubActive
+                                  ? "bg-[#383838] text-white"
+                                  : "text-white/80 hover:text-white"
+                              )}
+                            >
+                              {isSubLoading ? (
+                                <Loader2 className="h-3 w-3 text-white/70 animate-spin" />
+                              ) : (
+                                <subItem.icon
+                                  className={cn(
+                                    "h-3 w-3 transition-colors duration-200",
+                                    isSubActive
+                                      ? "text-white"
+                                      : "text-white/70 group-hover:text-white"
+                                  )}
+                                />
+                              )}
+                              <span className="text-sm transition-colors duration-200">
+                                {subItem.title}
+                              </span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
 
-                          <div
+              {settingItems.map((item) => {
+                const isActive = pathname === item.url;
+                const isLoading = loadingPath === item.url;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link
+                        href={item.url}
+                        onClick={() => handleLinkClick(item.url)}
+                        className={cn(
+                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          "hover:!bg-[#383838]",
+                          "focus-visible:outline-none",
+                          isLoading && "opacity-60 cursor-wait",
+                          isActive
+                            ? "bg-[#383838] text-white hover:text-white"
+                            : "text-white/90 hover:text-white"
+                        )}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                        ) : (
+                          <item.icon
                             className={cn(
-                              "flex items-center justify-center transition-transform duration-200",
-                              isActive && "scale-110"
+                              "h-4 w-4 transition-colors duration-200",
+                              isActive
+                                ? "text-white"
+                                : "text-white/70 group-hover:text-white"
                             )}
-                          >
-                            {isLoading ? (
-                              <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                            ) : (
-                              <item.icon
-                                className={cn(
-                                  "h-4 w-4 transition-colors duration-200",
-                                  isActive
-                                    ? "text-primary"
-                                    : "text-muted-foreground group-hover:text-foreground"
-                                )}
-                              />
-                            )}
-                          </div>
-                          <span
-                            className={cn(
-                              "text-sm transition-colors duration-200",
-                              isActive && "font-semibold"
-                            )}
-                          >
-                            {item.title}
-                          </span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                          />
+                        )}
+                        <span className="text-sm transition-colors duration-200">
+                          {item.title}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

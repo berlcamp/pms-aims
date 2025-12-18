@@ -1,37 +1,26 @@
-'use client'
-
-import { useEffect, useState } from 'react'
+"use client";
 
 export function Greeting({ name }: { name: string }) {
-  const [greeting, setGreeting] = useState('')
-  const [dateStr, setDateStr] = useState('')
+  const now = new Date();
 
-  useEffect(() => {
-    const now = new Date()
+  // Date
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
-    // Format date: Friday, May 16
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric'
-    }
-    const formattedDate = now.toLocaleDateString('en-US', options)
-    setDateStr(formattedDate)
-
-    // Determine greeting
-    const hour = now.getHours()
-    let greet = 'Hello'
-    if (hour < 12) greet = 'Good morning'
-    else if (hour < 18) greet = 'Good afternoon'
-    else greet = 'Good evening'
-
-    setGreeting(`${greet}, ${name}`)
-  }, [name])
+  // Greeting
+  const hour = now.getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
     <div className="space-y-1">
       <div className="text-lg text-gray-700 dark:text-gray-400">{dateStr}</div>
-      <div className="text-2xl font-semibold">{greeting}</div>
+      <div className="text-2xl font-semibold">
+        {greeting}, {name}
+      </div>
     </div>
-  )
+  );
 }

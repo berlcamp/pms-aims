@@ -2,6 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -20,18 +21,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAppDispatch } from "@/lib/redux/hook";
 import { addItem, updateList } from "@/lib/redux/listSlice";
 import { supabase2 } from "@/lib/supabase/admin";
 import { supabase } from "@/lib/supabase/client";
-import { User } from "@/types";
+import { Role, User } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -55,13 +49,15 @@ const FormSchema = z.object({
     .string()
     .min(1, "Email is required")
     .email("Please enter a valid email address"),
-  type: z.string().min(1, "Account Type is required"),
+  roleIds: z.array(z.number()).min(1, "At least one role must be selected"),
 });
 
 type FormType = z.infer<typeof FormSchema>;
 
 export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
 
   const dispatch = useAppDispatch();
 
@@ -70,9 +66,58 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
     defaultValues: {
       name: editData ? editData.name : "",
       email: editData ? editData.email : "",
-      type: editData ? editData.type : "",
+      roleIds: [],
     },
   });
+
+  // Fetch available roles
+  useEffect(() => {
+    const fetchRoles = async () => {
+      setLoadingRoles(true);
+      try {
+        const { data, error } = await supabase
+          .from("roles")
+          .select("*")
+          .eq("is_active", true)
+          .order("name");
+
+        if (error) throw error;
+        setAvailableRoles(data || []);
+      } catch (error) {
+        console.error("Error fetching roles:", error);
+        toast.error("Failed to load roles");
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchRoles();
+    }
+  }, [isOpen]);
+
+  // Fetch user roles when editing
+  useEffect(() => {
+    const fetchUserRoles = async () => {
+      if (editData?.id && isOpen) {
+        try {
+          const { data, error } = await supabase
+            .from("user_roles")
+            .select("role_id")
+            .eq("user_id", editData.id)
+            .eq("is_active", true);
+
+          if (error) throw error;
+          const roleIds = (data || []).map((ur) => ur.role_id);
+          form.setValue("roleIds", roleIds);
+        } catch (error) {
+          console.error("Error fetching user roles:", error);
+        }
+      }
+    };
+
+    fetchUserRoles();
+  }, [editData, isOpen, form]);
 
   // Submit handler
   const onSubmit = async (data: FormType) => {
@@ -114,8 +159,9 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         name: data.name.trim(),
         email: data.email.trim().toLowerCase(),
         user_id,
-        type: data.type,
       };
+
+      let userId: number;
 
       // 🔹 Step 4: Insert or Update logic
       if (editData?.id) {
@@ -126,10 +172,44 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
 
         if (error) throw new Error(error.message);
 
-        // ✅ Fetch updated record with category join
+        userId = parseInt(editData.id);
+
+        // Update user roles
+        // Deactivate all existing roles first
+        await supabase
+          .from("user_roles")
+          .update({ is_active: false })
+          .eq("user_id", userId);
+
+        // Add new roles
+        if (data.roleIds.length > 0) {
+          const roleInserts = data.roleIds.map((roleId) => ({
+            user_id: userId,
+            role_id: roleId,
+            division_id: null,
+            school_id: null,
+            is_active: true,
+          }));
+
+          // Use upsert to handle existing records (reactivate if exists, create if new)
+          for (const roleInsert of roleInserts) {
+            const { error: upsertError } = await supabase
+              .from("user_roles")
+              .upsert(roleInsert, {
+                onConflict: "user_id,role_id,division_id,school_id",
+              });
+            if (upsertError) {
+              console.error("Error upserting user role:", upsertError);
+            }
+          }
+        }
+
+        // ✅ Fetch updated record with user_roles relationship
         const { data: updated } = await supabase
           .from(table)
-          .select()
+          .select(
+            "*, user_roles!user_roles_user_id_fkey(roles(id, name, code, is_active))"
+          )
           .eq("id", editData.id)
           .single();
 
@@ -143,7 +223,9 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         const { data: inserted, error } = await supabase
           .from(table)
           .insert([newData])
-          .select()
+          .select(
+            "*, user_roles!user_roles_user_id_fkey(roles(id, name, code, is_active))"
+          )
           .single();
 
         if (error) {
@@ -151,7 +233,37 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           throw new Error(error.message);
         }
 
-        dispatch(addItem(inserted));
+        userId = inserted.id;
+
+        // Assign roles to user
+        if (data.roleIds.length > 0) {
+          const roleInserts = data.roleIds.map((roleId) => ({
+            user_id: userId,
+            role_id: roleId,
+            is_active: true,
+          }));
+
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert(roleInserts);
+
+          if (roleError) {
+            console.error("Error assigning roles:", roleError);
+            toast.error("User created but failed to assign roles");
+          }
+        }
+
+        // ✅ Fetch complete record with user_roles relationship
+        const { data: completeRecord } = await supabase
+          .from(table)
+          .select(
+            "*, user_roles!user_roles_user_id_fkey(roles(id, name, code, is_active))"
+          )
+          .eq("id", userId)
+          .single();
+
+        // Always dispatch the complete record (with or without roles)
+        dispatch(addItem(completeRecord || inserted));
         onClose();
         toast.success("Staff member added successfully!");
       }
@@ -168,7 +280,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
       form.reset({
         name: editData?.name || "",
         email: editData?.email || "",
-        type: editData?.type || "",
+        roleIds: [],
       });
     }
   }, [form, editData, isOpen]);
@@ -244,30 +356,79 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
 
             <FormField
               control={form.control}
-              name="type"
-              render={({ field }) => (
+              name="roleIds"
+              render={() => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Account Type <span className="text-red-500">*</span>
-                  </FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select account type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="employee">Employee</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="text-xs">
-                    Determines the user&apos;s access level and permissions.
-                  </FormDescription>
+                  <div className="mb-4">
+                    <FormLabel className="text-sm font-medium">
+                      Roles <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormDescription className="text-xs">
+                      Select one or more roles to assign to this user.
+                    </FormDescription>
+                  </div>
+                  {loadingRoles ? (
+                    <div className="text-sm text-muted-foreground">
+                      Loading roles...
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[200px] overflow-y-auto border rounded-lg p-4">
+                      {availableRoles.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No roles available
+                        </p>
+                      ) : (
+                        availableRoles.map((role) => (
+                          <FormField
+                            key={role.id}
+                            control={form.control}
+                            name="roleIds"
+                            render={({ field }) => {
+                              return (
+                                <FormItem
+                                  key={role.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0"
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(role.id)}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        return checked
+                                          ? field.onChange([
+                                              ...(field.value || []),
+                                              role.id,
+                                            ])
+                                          : field.onChange(
+                                              (field.value || []).filter(
+                                                (value) => value !== role.id
+                                              )
+                                            );
+                                      }}
+                                      disabled={isSubmitting}
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel className="text-sm font-normal cursor-pointer">
+                                      {role.name}
+                                    </FormLabel>
+                                    <p className="text-xs text-muted-foreground">
+                                      {role.code} • {role.level}
+                                    </p>
+                                    {role.description && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {role.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

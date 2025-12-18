@@ -5,7 +5,7 @@ export const supabase2 = createClient(
   process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY ?? "",
   {
     db: {
-      schema: "assets", // ✅ Use the custom schema by default
+      schema: "procurements", // ✅ Use the custom schema by default
     },
   }
 );

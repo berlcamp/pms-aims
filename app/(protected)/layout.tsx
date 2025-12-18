@@ -9,12 +9,13 @@ import StickyHeader from "@/components/StickyHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAppSelector } from "@/lib/redux/hook";
 import { Providers } from "@/lib/redux/providers";
-import { TenantProvider } from "@/lib/tenant/context";
+
 import { Suspense } from "react";
 import { Toaster } from "react-hot-toast";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const user = useAppSelector((state) => state.user.user);
+  console.log(user);
   const isAgent = user?.type === "agent";
 
   if (isAgent) {
@@ -56,9 +57,7 @@ export default function AuthLayout({
       <Providers>
         <Suspense fallback={<LoadingSkeleton />}>
           <AuthGuard>
-            <TenantProvider>
-              <LayoutContent>{children}</LayoutContent>
-            </TenantProvider>
+            <LayoutContent>{children}</LayoutContent>
           </AuthGuard>
         </Suspense>
       </Providers>

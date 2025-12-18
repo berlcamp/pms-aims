@@ -1,7 +1,6 @@
 "use client";
 
 import { ConfirmationModal } from "@/components/ConfirmationModal";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,25 +11,15 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { deleteItem } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Role, User } from "@/types"; // Import the RootState type
+import { Division } from "@/types/database";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { AddModal } from "./AddModal";
 
 // Always update this on other pages
-type ItemType = User;
-const table = "users";
-
-// Helper function to get initials from name
-const getInitials = (name: string): string => {
-  if (!name) return "?";
-  const parts = name.trim().split(" ");
-  if (parts.length === 1) {
-    return parts[0].charAt(0).toUpperCase();
-  }
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-};
+type ItemType = Division;
+const table = "divisions";
 
 export const List = ({}) => {
   const dispatch = useAppDispatch();
@@ -41,7 +30,7 @@ export const List = ({}) => {
 
   const [selectedItem, setSelectedItem] = useState<ItemType | null>(null);
 
-  // Handle opening the confirmation modal for deleting a supplier
+  // Handle opening the confirmation modal for deleting a division
   const handleDeleteConfirmation = (item: ItemType) => {
     setSelectedItem(item);
     setIsModalOpen(true);
@@ -52,7 +41,7 @@ export const List = ({}) => {
     setModalAddOpen(true);
   };
 
-  // Delete Supplier
+  // Delete Division
   const handleDelete = async () => {
     if (selectedItem) {
       const { error } = await supabase
@@ -80,8 +69,10 @@ export const List = ({}) => {
         <table className="app__table">
           <thead className="app__table_thead">
             <tr>
+              <th className="app__table_th">Code</th>
               <th className="app__table_th">Name</th>
-              <th className="app__table_th">Role</th>
+              <th className="app__table_th">Region</th>
+              <th className="app__table_th">Province</th>
               <th className="app__table_th_right">Actions</th>
             </tr>
           </thead>
@@ -90,52 +81,25 @@ export const List = ({}) => {
               <tr key={item.id} className="app__table_tr">
                 <td className="app__table_td">
                   <div className="app__table_cell_content">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                        {getInitials(item.name || "")}
-                      </AvatarFallback>
-                    </Avatar>
                     <div className="app__table_cell_text">
                       <div className="app__table_cell_title">
-                        {item.name || "-"}
-                      </div>
-                      <div className="app__table_cell_subtitle">
-                        {item.email || "-"}
+                        {item.code || "-"}
                       </div>
                     </div>
                   </div>
                 </td>
                 <td className="app__table_td">
-                  {item.user_roles && item.user_roles.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {Array.from(
-                        new Map(
-                          item.user_roles
-                            .filter(
-                              (userRole) => userRole.roles?.is_active !== false
-                            )
-                            .map((userRole) => [
-                              userRole.roles?.id,
-                              userRole.roles,
-                            ])
-                        ).values()
-                      )
-                        .filter(
-                          (role): role is Role =>
-                            role !== null && role !== undefined
-                        )
-                        .map((role, index) => (
-                          <span
-                            key={role.id || index}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {role.name || "Unknown Role"}
-                          </span>
-                        ))}
+                  <div className="app__table_cell_text">
+                    <div className="app__table_cell_title">
+                      {item.name || "-"}
                     </div>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">-</span>
-                  )}
+                  </div>
+                </td>
+                <td className="app__table_td">
+                  <span className="text-sm">{item.region || "-"}</span>
+                </td>
+                <td className="app__table_td">
+                  <span className="text-sm">{item.province || "-"}</span>
                 </td>
                 <td className="app__table_td_actions">
                   <div className="app__table_action_container">

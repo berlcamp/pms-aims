@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Database Type Definitions for DepEd PMS & AIMS
- * 
+ *
  * This file contains TypeScript interfaces for all database entities
  * in the Procurement Management System and Asset Inventory & Management System.
- * 
+ *
  * Schema: assets
  */
 
@@ -54,7 +55,14 @@ export interface Permission {
   description?: string;
   module: "pms" | "aims" | "system";
   resource: string; // e.g., "pr", "po", "proposal"
-  action: "create" | "read" | "update" | "delete" | "approve" | "reject" | "print";
+  action:
+    | "create"
+    | "read"
+    | "update"
+    | "delete"
+    | "approve"
+    | "reject"
+    | "print";
   created_at: string;
 }
 
@@ -579,8 +587,18 @@ export interface ProcurementPayment {
 // APPROVAL WORKFLOW ENGINE
 // ============================================================================
 
-export type ApprovalAction = "approve" | "reject" | "return" | "forward" | "cancel";
-export type ApprovalStatus = "pending" | "approved" | "rejected" | "returned" | "cancelled";
+export type ApprovalAction =
+  | "approve"
+  | "reject"
+  | "return"
+  | "forward"
+  | "cancel";
+export type ApprovalStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "returned"
+  | "cancelled";
 
 export interface ApprovalWorkflow {
   id: string;
@@ -697,55 +715,55 @@ export interface Database {
   role_permissions: RolePermission;
   users: User;
   user_roles: UserRole;
-  
+
   // Audit
   audit_logs: AuditLog;
-  
+
   // Procurement Planning
   procurement_proposals: ProcurementProposal;
   proposal_items: ProposalItem;
-  
+
   // Pre-Procurement Evaluation
   pre_procurement_evaluations: PreProcurementEvaluation;
-  
+
   // Procurement Methods
   procurement_method_configs: ProcurementMethodConfig;
-  
+
   // Purchase Request
   purchase_requests: PurchaseRequest;
   pr_items: PRItem;
-  
+
   // Purchase Order
   purchase_orders: PurchaseOrder;
   po_items: POItem;
   po_amendments: POAmendment;
-  
+
   // Suppliers
   suppliers: Supplier;
   supplier_quotations: SupplierQuotation;
   quotation_items: QuotationItem;
-  
+
   // Canvassing
   canvasses: Canvass;
   canvass_suppliers: CanvassSupplier;
-  
+
   // Delivery & Inspection
   delivery_receipts: DeliveryReceipt;
   delivery_items: DeliveryItem;
   inspection_acceptance_reports: InspectionAcceptanceReport;
   iar_items: IARItem;
-  
+
   // Payment
   procurement_payments: ProcurementPayment;
-  
+
   // Approval Workflow
   approval_workflows: ApprovalWorkflow;
   approval_steps: ApprovalStep;
   approval_action_logs: ApprovalActionLog;
-  
+
   // Documents
   procurement_documents: ProcurementDocument;
-  
+
   // Notifications
   notifications: Notification;
 }

@@ -2,6 +2,7 @@
 
 import { setUser } from "@/lib/redux/userSlice";
 import { supabase } from "@/lib/supabase/client";
+import { Permission, RolePermission, UserRole } from "@/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -41,6 +42,52 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Fetch user roles with role details
+      const { data: userRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select(
+          `
+          *,
+          role:roles(*)
+        `
+        )
+        .eq("user_id", systemUser.id)
+        .eq("is_active", true);
+
+      if (rolesError) {
+        console.error("Failed to fetch user roles:", rolesError);
+      }
+
+      // Fetch permissions for all user roles
+      let permissions: Permission[] = [];
+      const typedUserRoles: UserRole[] = (userRoles || []) as UserRole[];
+      if (typedUserRoles.length > 0) {
+        const roleIds = typedUserRoles.map((ur) => ur.role_id);
+        const { data: rolePermissions, error: permissionsError } =
+          await supabase
+            .from("role_permissions")
+            .select(
+              `
+            *,
+            permission:permissions(*)
+          `
+            )
+            .in("role_id", roleIds);
+
+        if (permissionsError) {
+          console.error("Failed to fetch permissions:", permissionsError);
+        } else if (rolePermissions) {
+          // Extract unique permissions
+          const permissionMap = new Map<number, Permission>();
+          (rolePermissions as RolePermission[]).forEach((rp) => {
+            if (rp.permission) {
+              permissionMap.set(rp.permission.id, rp.permission);
+            }
+          });
+          permissions = Array.from(permissionMap.values());
+        }
+      }
+
       // Fetch locations the user is allowed to access
       try {
         dispatch(
@@ -49,6 +96,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             system_user_id: systemUser.id,
             name: systemUser.name,
             type: systemUser.type,
+            roles: typedUserRoles,
+            permissions: permissions,
           })
         );
       } catch (error) {
