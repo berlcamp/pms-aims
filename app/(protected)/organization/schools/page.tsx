@@ -3,11 +3,12 @@
 import { Button } from "@/components/ui/button";
 
 import Notfoundpage from "@/components/Notfoundpage";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { PER_PAGE } from "@/lib/constants";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { addList } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddModal } from "./AddModal";
 import { Filter } from "./Filter";
 import { List } from "./List";
@@ -24,26 +25,9 @@ export default function Page() {
   const dispatch = useAppDispatch();
 
   const user = useAppSelector((state) => state.user.user);
-  const filterKeywordRef = useRef(filter.keyword);
-  const pageRef = useRef(page);
 
-  // Update pageRef when page changes
-  useEffect(() => {
-    pageRef.current = page;
-  }, [page]);
-
-  // Wrapper function to reset page when filter changes
-  // Using useCallback to ensure stable reference and batch updates
-  const handleFilterChange = useCallback((newFilter: { keyword: string }) => {
-    const filterChanged = filterKeywordRef.current !== newFilter.keyword;
-    filterKeywordRef.current = newFilter.keyword;
-
-    // Batch both updates together - React 18 will batch these automatically
-    setFilter(newFilter);
-    if (filterChanged && pageRef.current !== 1) {
-      setPage(1);
-    }
-  }, []);
+  // Memoize filter keyword to prevent unnecessary re-renders
+  const filterKeyword = useMemo(() => filter.keyword, [filter.keyword]);
 
   // Fetch data on page load
   useEffect(() => {
@@ -55,18 +39,24 @@ export default function Page() {
 
       let query = supabase
         .from("schools")
-        .select("*, divisions(id, code, name)", { count: "exact" });
+        .select("*, divisions(id, code, name)", { count: "exact" })
+        .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID);
 
       // Search in both name and code fields
-      if (filter.keyword) {
+      if (filterKeyword) {
         query = query.or(
-          `name.ilike.%${filter.keyword}%,code.ilike.%${filter.keyword}%`
+          `name.ilike.%${filterKeyword}%,code.ilike.%${filterKeyword}%`
         );
       }
 
-      const { data, count, error } = await query
-        .range((page - 1) * PER_PAGE, page * PER_PAGE - 1)
-        .order("id", { ascending: false });
+      // Only apply pagination when there's no filter
+      if (!filterKeyword) {
+        query = query.range((page - 1) * PER_PAGE, page * PER_PAGE - 1);
+      }
+
+      const { data, count, error } = await query.order("id", {
+        ascending: false,
+      });
       console.log("data", data);
       // Only update state if component is still mounted
       if (!isMounted) return;
@@ -77,6 +67,7 @@ export default function Page() {
         // Update the list of schools in Redux store
         dispatch(addList(data));
         setTotalCount(count || 0);
+        console.log("totalCount", count || 0); // Log the actual count value, not the state
       }
       setLoading(false);
     };
@@ -87,7 +78,7 @@ export default function Page() {
     return () => {
       isMounted = false;
     };
-  }, [page, filter, dispatch]);
+  }, [page, filterKeyword, dispatch]);
 
   if (user?.type != "super admin") {
     return <Notfoundpage />;
@@ -98,7 +89,7 @@ export default function Page() {
       <div className="app__title">
         <h1 className="app__title_text">Schools</h1>
         <div className="app__title_actions">
-          <Filter filter={filter} setFilter={handleFilterChange} />
+          <Filter filter={filter} setFilter={setFilter} />
           <Button
             variant="green"
             onClick={() => setModalAddOpen(true)}
@@ -124,8 +115,7 @@ export default function Page() {
       <div className="app__content">
         {/* Pass Redux data to List Table */}
         {loading ? (
-          // <TableSkeleton />
-          <div>Loading...</div>
+          <TableSkeleton />
         ) : totalCount === 0 ? (
           <div className="app__empty_state">
             <div className="app__empty_state_icon">
@@ -155,7 +145,7 @@ export default function Page() {
         )}
 
         {/* Pagination */}
-        {totalCount > 0 && totalCount > PER_PAGE && (
+        {!filter.keyword && totalCount > 0 && totalCount > PER_PAGE && (
           <div className="app__pagination">
             <div className="app__pagination_info">
               Page <span className="font-medium">{page}</span> of{" "}

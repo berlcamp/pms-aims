@@ -13,18 +13,23 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAppDispatch } from "@/lib/redux/hook";
 import { addItem, updateList } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { School } from "@/types/database";
+import { Office, School } from "@/types/database";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -32,9 +37,9 @@ import toast from "react-hot-toast";
 import { z } from "zod";
 
 // Always update this on other pages
-type ItemType = School;
-const table = "schools";
-const title = "School";
+type ItemType = Office;
+const table = "offices";
+const title = "Office";
 
 interface ModalProps {
   isOpen: boolean;
@@ -42,17 +47,34 @@ interface ModalProps {
   editData?: ItemType | null; // Optional prop for editing existing item
 }
 
-const FormSchema = z.object({
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
-  school_id: z.string().optional(),
-  address: z.string().optional(),
-});
+const FormSchema = z
+  .object({
+    code: z.string().min(1, "Code is required"),
+    name: z.string().min(1, "Name is required"),
+    office_type: z.enum(["division_office", "school"], {
+      required_error: "Office type is required",
+    }),
+    school_id: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.office_type === "school") {
+        return data.school_id && data.school_id.length > 0;
+      }
+      return true;
+    },
+    {
+      message: "School is required when office type is School",
+      path: ["school_id"],
+    }
+  );
 
 type FormType = z.infer<typeof FormSchema>;
 
 export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableSchools, setAvailableSchools] = useState<School[]>([]);
+  const [loadingSchools, setLoadingSchools] = useState(false);
 
   const dispatch = useAppDispatch();
 
@@ -61,10 +83,55 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
     defaultValues: {
       code: editData ? editData.code : "",
       name: editData ? editData.name : "",
-      school_id: editData ? editData.school_id : "",
-      address: editData ? editData.address : "",
+      office_type: editData ? editData.office_type : "division_office",
+      school_id: editData ? editData.school_id || "" : "",
     },
   });
+
+  const officeType = form.watch("office_type");
+  const divisionId = process.env.NEXT_PUBLIC_DIVISION_ID;
+
+  // Fetch available schools when office_type is "school"
+  useEffect(() => {
+    const fetchSchools = async () => {
+      if (!divisionId || officeType !== "school") {
+        setAvailableSchools([]);
+        if (officeType === "division_office") {
+          form.setValue("school_id", "");
+        }
+        return;
+      }
+
+      setLoadingSchools(true);
+      try {
+        const { data, error } = await supabase
+          .from("schools")
+          .select("*")
+          .eq("division_id", divisionId)
+          .eq("is_active", true)
+          .order("name");
+
+        if (error) throw error;
+        setAvailableSchools(data || []);
+      } catch (error) {
+        console.error("Error fetching schools:", error);
+        toast.error("Failed to load schools");
+      } finally {
+        setLoadingSchools(false);
+      }
+    };
+
+    if (isOpen && divisionId) {
+      fetchSchools();
+    }
+  }, [isOpen, divisionId, officeType, form]);
+
+  // Update form validation based on office_type
+  useEffect(() => {
+    if (officeType === "division_office") {
+      form.setValue("school_id", "");
+    }
+  }, [officeType, form]);
 
   // Submit handler
   const onSubmit = async (data: FormType) => {
@@ -76,8 +143,11 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         code: data.code.trim(),
         name: data.name.trim(),
         division_id: process.env.NEXT_PUBLIC_DIVISION_ID,
-        school_id: data.school_id?.trim() || null,
-        address: data.address?.trim() || null,
+        office_type: data.office_type,
+        school_id:
+          data.office_type === "school" && data.school_id
+            ? parseInt(data.school_id)
+            : null,
       };
 
       if (editData?.id) {
@@ -93,10 +163,10 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
             throw new Error(error.message);
           }
         } else {
-          // ✅ Fetch updated record with division relationship
+          // ✅ Fetch updated record with relationships
           const { data: updated } = await supabase
             .from(table)
-            .select("*, divisions(id, code, name)")
+            .select("*, divisions(id, code, name), schools(id, code, name)")
             .eq("id", editData.id)
             .single();
 
@@ -105,13 +175,13 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           }
 
           onClose();
-          toast.success("School updated successfully!");
+          toast.success("Office updated successfully!");
         }
       } else {
         const { data: inserted, error } = await supabase
           .from(table)
           .insert([newData])
-          .select("*, divisions(id, code, name)")
+          .select("*, divisions(id, code, name), schools(id, code, name)")
           .single();
 
         if (error) {
@@ -123,12 +193,12 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         } else {
           dispatch(addItem(inserted));
           onClose();
-          toast.success("School added successfully!");
+          toast.success("Office added successfully!");
         }
       }
     } catch (err) {
       console.error("Submission error:", err);
-      toast.error(err instanceof Error ? err.message : "Error saving school");
+      toast.error(err instanceof Error ? err.message : "Error saving office");
     } finally {
       setIsSubmitting(false);
     }
@@ -139,8 +209,8 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
       form.reset({
         code: editData?.code || "",
         name: editData?.name || "",
+        office_type: editData?.office_type || "division_office",
         school_id: editData?.school_id || "",
-        address: editData?.address || "",
       });
     }
   }, [form, editData, isOpen]);
@@ -161,8 +231,8 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           </DialogTitle>
           <DialogDescription>
             {editData
-              ? "Update school information below."
-              : "Fill in the details to add a new school."}
+              ? "Update office information below."
+              : "Fill in the details to add a new office."}
           </DialogDescription>
         </DialogHeader>
 
@@ -170,15 +240,88 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             <FormField
               control={form.control}
+              name="office_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">
+                    Office Type <span className="text-red-500">*</span>
+                  </FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select office type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="division_office">
+                        Division Office
+                      </SelectItem>
+                      <SelectItem value="school">School</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {officeType === "school" && (
+              <FormField
+                control={form.control}
+                name="school_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">
+                      School <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={isSubmitting || loadingSchools || !divisionId}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Select a school" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableSchools.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            {loadingSchools
+                              ? "Loading schools..."
+                              : !divisionId
+                              ? "Please select a division first"
+                              : "No schools available"}
+                          </SelectItem>
+                        ) : (
+                          availableSchools.map((school) => (
+                            <SelectItem key={school.id} value={school.id}>
+                              {school.name} ({school.code})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
+              control={form.control}
               name="code"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium">
-                    School Code <span className="text-red-500">*</span>
+                    Office Code <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Enter school code"
+                      placeholder="Enter office code"
                       className="h-10"
                       {...field}
                       disabled={isSubmitting}
@@ -195,55 +338,12 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium">
-                    School Name <span className="text-red-500">*</span>
+                    Office Name <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Enter school name"
+                      placeholder="Enter office name"
                       className="h-10"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="school_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    DepEd School ID
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter DepEd School ID (optional)"
-                      className="h-10"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription className="text-xs">
-                    Official DepEd School ID (optional)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">Address</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter school address (optional)"
-                      className="min-h-[80px]"
                       {...field}
                       disabled={isSubmitting}
                     />

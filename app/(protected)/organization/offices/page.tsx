@@ -1,14 +1,14 @@
 "use client";
 
-import { TableSkeleton } from "@/components/TableSkeleton";
 import { Button } from "@/components/ui/button";
 
 import Notfoundpage from "@/components/Notfoundpage";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { PER_PAGE } from "@/lib/constants";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { addList } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddModal } from "./AddModal";
 import { Filter } from "./Filter";
 import { List } from "./List";
@@ -25,47 +25,40 @@ export default function Page() {
   const dispatch = useAppDispatch();
 
   const user = useAppSelector((state) => state.user.user);
-  const filterKeywordRef = useRef(filter.keyword);
 
   // Memoize filter keyword to prevent unnecessary re-renders
   const filterKeyword = useMemo(() => filter.keyword, [filter.keyword]);
-
-  // Wrapper function to reset page when filter changes
-  const handleFilterChange = useCallback((newFilter: { keyword: string }) => {
-    setFilter(newFilter);
-    // Reset to page 1 when filter keyword changes
-    if (filterKeywordRef.current !== newFilter.keyword) {
-      filterKeywordRef.current = newFilter.keyword;
-      setPage(1);
-    }
-  }, []);
 
   // Fetch data on page load
   useEffect(() => {
     let isMounted = true;
 
     const fetchData = async () => {
-      setLoading(true); // Set loading before clearing list
+      setLoading(true);
       dispatch(addList([])); // Reset the list
 
       let query = supabase
-        .from("users")
-        .select(
-          "*, user_roles!user_roles_user_id_fkey(roles(id, name, code, is_active))",
-          { count: "exact" }
-        )
+        .from("offices")
+        .select("*, divisions(id, code, name), schools(id, code, name)", {
+          count: "exact",
+        })
         .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID);
 
-      // Search in both name and email fields
+      // Search in both name and code fields
       if (filterKeyword) {
         query = query.or(
-          `name.ilike.%${filterKeyword}%,email.ilike.%${filterKeyword}%`
+          `name.ilike.%${filterKeyword}%,code.ilike.%${filterKeyword}%`
         );
       }
 
-      const { data, count, error } = await query
-        .range((page - 1) * PER_PAGE, page * PER_PAGE - 1)
-        .order("id", { ascending: false });
+      // Only apply pagination when there's no filter
+      if (!filterKeyword) {
+        query = query.range((page - 1) * PER_PAGE, page * PER_PAGE - 1);
+      }
+
+      const { data, count, error } = await query.order("id", {
+        ascending: false,
+      });
       console.log("data", data);
       // Only update state if component is still mounted
       if (!isMounted) return;
@@ -73,7 +66,7 @@ export default function Page() {
       if (error) {
         console.error(error);
       } else {
-        // Update the list of suppliers in Redux store
+        // Update the list of offices in Redux store
         dispatch(addList(data));
         setTotalCount(count || 0);
       }
@@ -95,9 +88,9 @@ export default function Page() {
   return (
     <div>
       <div className="app__title">
-        <h1 className="app__title_text">Staff</h1>
+        <h1 className="app__title_text">Offices</h1>
         <div className="app__title_actions">
-          <Filter filter={filter} setFilter={handleFilterChange} />
+          <Filter filter={filter} setFilter={setFilter} />
           <Button
             variant="green"
             onClick={() => setModalAddOpen(true)}
@@ -116,7 +109,7 @@ export default function Page() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Add Staff
+            Add Office
           </Button>
         </div>
       </div>
@@ -137,15 +130,15 @@ export default function Page() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={1.5}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                 />
               </svg>
             </div>
-            <p className="app__empty_state_title">No staff members found</p>
+            <p className="app__empty_state_title">No offices found</p>
             <p className="app__empty_state_description">
               {filter.keyword
                 ? "Try adjusting your search criteria"
-                : "Get started by adding a new staff member"}
+                : "Get started by adding a new office"}
             </p>
           </div>
         ) : (
@@ -153,7 +146,7 @@ export default function Page() {
         )}
 
         {/* Pagination */}
-        {totalCount > 0 && totalCount > PER_PAGE && (
+        {!filter.keyword && totalCount > 0 && totalCount > PER_PAGE && (
           <div className="app__pagination">
             <div className="app__pagination_info">
               Page <span className="font-medium">{page}</span> of{" "}

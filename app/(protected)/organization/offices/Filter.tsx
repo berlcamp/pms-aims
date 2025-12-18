@@ -55,7 +55,7 @@ export const Filter = ({
         <div className="space-y-4">
           <div>
             <label className="text-xs font-medium text-gray-700 mb-1.5 block">
-              Search Staff
+              Search Offices
             </label>
             <div className="relative">
               <Search
@@ -65,7 +65,7 @@ export const Filter = ({
               <Input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Search by name or email..."
+                placeholder="Search by name or code..."
                 className="pl-9 pr-9 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 w-full"
               />
               {keyword && (

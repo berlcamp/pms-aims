@@ -37,6 +37,19 @@ export interface School {
   deleted_at?: string | null;
 }
 
+export interface Office {
+  id: string;
+  division_id: string;
+  code: string; // Office code (e.g., "OFF-001")
+  name: string;
+  office_type: "division_office" | "school";
+  school_id?: string | null;
+  head_user_id?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Role {
   id: string;
   code: string; // e.g., "SDS", "SUPPLY_OFFICER", "BUDGET_OFFICER"

@@ -41,7 +41,8 @@ export function AppSidebar() {
   // Check if we're on an organization submenu page
   const isOnOrganizationPage =
     pathname?.startsWith("/organization/schools") ||
-    pathname?.startsWith("/organization/division-offices");
+    pathname?.startsWith("/organization/division-offices") ||
+    pathname?.startsWith("/organization/offices");
 
   // Initialize organization submenu as open if on organization pages, otherwise closed
   const [isOrganizationOpen, setIsOrganizationOpen] = useState(
@@ -121,8 +122,8 @@ export function AppSidebar() {
       icon: School,
     },
     {
-      title: "Division Offices",
-      url: "/organization/division-offices",
+      title: "Offices",
+      url: "/organization/offices",
       icon: Building2,
     },
   ];
@@ -252,23 +253,25 @@ export function AppSidebar() {
                 >
                   <Building2
                     className={cn(
-                      "h-4 w-4 transition-colors duration-200",
+                      "h-4 w-4 transition-colors duration-200 flex-shrink-0",
                       isOrganizationSubItemActive || isOrganizationOpen
                         ? "text-white"
                         : "text-white/70 group-hover:text-white"
                     )}
                   />
-                  <span className="text-sm transition-colors duration-200 flex-1">
+                  <span className="text-sm font-medium transition-colors duration-200 flex-1">
                     Organization
                   </span>
-                  {isOrganizationOpen ? (
-                    <ChevronDown className="h-4 w-4 text-white/70 group-hover:text-white transition-transform duration-200" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-white/70 group-hover:text-white transition-transform duration-200" />
-                  )}
+                  <div className="flex-shrink-0 transition-transform duration-300 ease-in-out">
+                    {isOrganizationOpen ? (
+                      <ChevronDown className="h-4 w-4 text-white/70 group-hover:text-white" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-white/70 group-hover:text-white" />
+                    )}
+                  </div>
                 </SidebarMenuButton>
                 {isOrganizationOpen && (
-                  <SidebarMenuSub>
+                  <SidebarMenuSub className="mt-1.5 ml-2 pl-2 border-l border-white/10">
                     {organizationSubItems.map((subItem) => {
                       const isSubActive = pathname === subItem.url;
                       const isSubLoading = loadingPath === subItem.url;
@@ -279,28 +282,30 @@ export function AppSidebar() {
                               href={subItem.url}
                               onClick={() => handleLinkClick(subItem.url)}
                               className={cn(
-                                "group flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-200",
+                                "group relative flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-md transition-all duration-200",
                                 "hover:!bg-[#383838]",
                                 "focus-visible:outline-none",
                                 isSubLoading && "opacity-60 cursor-wait",
                                 isSubActive
-                                  ? "bg-[#383838] text-white"
-                                  : "text-white/80 hover:text-white"
+                                  ? "!bg-[#383838] !text-white"
+                                  : "text-white/75 hover:text-white hover:bg-white/5"
                               )}
                             >
-                              {isSubLoading ? (
-                                <Loader2 className="h-3 w-3 text-white/70 animate-spin" />
-                              ) : (
-                                <subItem.icon
-                                  className={cn(
-                                    "h-3 w-3 transition-colors duration-200",
-                                    isSubActive
-                                      ? "text-white"
-                                      : "text-white/70 group-hover:text-white"
-                                  )}
-                                />
+                              {/* Active indicator bar */}
+                              {isSubActive && (
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-white rounded-r-full" />
                               )}
-                              <span className="text-sm transition-colors duration-200">
+                              {isSubLoading ? (
+                                <Loader2 className="h-3.5 w-3.5 text-white/70 animate-spin flex-shrink-0" />
+                              ) : (
+                                <subItem.icon className="h-3.5 w-3.5 !text-white flex-shrink-0" />
+                              )}
+                              <span
+                                className={cn(
+                                  "text-sm transition-colors duration-200",
+                                  isSubActive && "!text-white"
+                                )}
+                              >
                                 {subItem.title}
                               </span>
                             </Link>

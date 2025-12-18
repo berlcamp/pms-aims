@@ -27,7 +27,7 @@ export const Filter = ({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [keyword, setFilter]);
+  }, [keyword]);
 
   const handleReset = () => {
     setKeyword("");

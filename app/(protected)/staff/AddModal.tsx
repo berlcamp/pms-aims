@@ -159,6 +159,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         name: data.name.trim(),
         email: data.email.trim().toLowerCase(),
         user_id,
+        division_id: process.env.NEXT_PUBLIC_DIVISION_ID,
       };
 
       let userId: number;
@@ -186,7 +187,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           const roleInserts = data.roleIds.map((roleId) => ({
             user_id: userId,
             role_id: roleId,
-            division_id: null,
+            division_id: process.env.NEXT_PUBLIC_DIVISION_ID,
             school_id: null,
             is_active: true,
           }));
@@ -240,6 +241,8 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           const roleInserts = data.roleIds.map((roleId) => ({
             user_id: userId,
             role_id: roleId,
+            division_id: process.env.NEXT_PUBLIC_DIVISION_ID,
+            school_id: null,
             is_active: true,
           }));
 
