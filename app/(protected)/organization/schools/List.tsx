@@ -11,7 +11,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { deleteItem } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Division, School } from "@/types/database";
+import { Division, School, User } from "@/types/database";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -20,6 +20,7 @@ import { AddModal } from "./AddModal";
 // Always update this on other pages
 type ItemType = School & {
   divisions?: Division | null;
+  head_user?: User | null;
 };
 const table = "schools";
 
@@ -71,25 +72,15 @@ export const List = ({}) => {
         <table className="app__table">
           <thead className="app__table_thead">
             <tr>
-              <th className="app__table_th">Code</th>
               <th className="app__table_th">Name</th>
-              <th className="app__table_th">Division</th>
               <th className="app__table_th">School ID</th>
+              <th className="app__table_th">Head of School</th>
               <th className="app__table_th_right">Actions</th>
             </tr>
           </thead>
           <tbody className="app__table_tbody">
             {list.map((item: ItemType) => (
               <tr key={item.id} className="app__table_tr">
-                <td className="app__table_td">
-                  <div className="app__table_cell_content">
-                    <div className="app__table_cell_text">
-                      <div className="app__table_cell_title">
-                        {item.code || "-"}
-                      </div>
-                    </div>
-                  </div>
-                </td>
                 <td className="app__table_td">
                   <div className="app__table_cell_text">
                     <div className="app__table_cell_title">
@@ -103,16 +94,27 @@ export const List = ({}) => {
                   </div>
                 </td>
                 <td className="app__table_td">
-                  {item.divisions ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
-                      {item.divisions.name || item.divisions.code || "-"}
-                    </span>
+                  <span className="text-sm">
+                    {item.school_id || (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </span>
+                </td>
+                <td className="app__table_td">
+                  {item.head_user ? (
+                    <div className="app__table_cell_text">
+                      <div className="app__table_cell_title">
+                        {item.head_user.name || "-"}
+                      </div>
+                      {item.head_user.email && (
+                        <div className="app__table_cell_subtitle">
+                          {item.head_user.email}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-muted-foreground text-sm">-</span>
                   )}
-                </td>
-                <td className="app__table_td">
-                  <span className="text-sm">{item.school_id || "-"}</span>
                 </td>
                 <td className="app__table_td_actions">
                   <div className="app__table_action_container">

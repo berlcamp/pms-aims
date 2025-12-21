@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UserSelect } from "@/components/UserSelect";
 import { useAppDispatch } from "@/lib/redux/hook";
 import { addItem, updateList } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
@@ -55,6 +56,7 @@ const FormSchema = z
       required_error: "Office type is required",
     }),
     school_id: z.string().optional(),
+    head_user_id: z.string().nullable().optional(),
   })
   .refine(
     (data) => {
@@ -85,6 +87,9 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
       name: editData ? editData.name : "",
       office_type: editData ? editData.office_type : "division_office",
       school_id: editData ? editData.school_id || "" : "",
+      head_user_id: editData?.head_user_id
+        ? String(editData.head_user_id)
+        : null,
     },
   });
 
@@ -148,6 +153,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           data.office_type === "school" && data.school_id
             ? parseInt(data.school_id)
             : null,
+        head_user_id: data.head_user_id ? parseInt(data.head_user_id) : null,
       };
 
       if (editData?.id) {
@@ -166,7 +172,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
           // ✅ Fetch updated record with relationships
           const { data: updated } = await supabase
             .from(table)
-            .select("*, divisions(id, code, name), schools(id, code, name)")
+            .select("*, head_user:head_user_id(id, name, email)")
             .eq("id", editData.id)
             .single();
 
@@ -181,7 +187,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         const { data: inserted, error } = await supabase
           .from(table)
           .insert([newData])
-          .select("*, divisions(id, code, name), schools(id, code, name)")
+          .select("*, head_user:head_user_id(id, name, email)")
           .single();
 
         if (error) {
@@ -211,6 +217,9 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         name: editData?.name || "",
         office_type: editData?.office_type || "division_office",
         school_id: editData?.school_id || "",
+        head_user_id: editData?.head_user_id
+          ? String(editData.head_user_id)
+          : null,
       });
     }
   }, [form, editData, isOpen]);
@@ -346,6 +355,28 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
                       className="h-10"
                       {...field}
                       disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="head_user_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">
+                    Head User
+                  </FormLabel>
+                  <FormControl>
+                    <UserSelect
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      placeholder="Select head user (optional)"
+                      divisionId={divisionId || undefined}
                     />
                   </FormControl>
                   <FormMessage />

@@ -39,7 +39,7 @@ export default function Page() {
 
       let query = supabase
         .from("offices")
-        .select("*, divisions(id, code, name), schools(id, code, name)", {
+        .select("*,head_user:head_user_id(id, name, email)", {
           count: "exact",
         })
         .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID);

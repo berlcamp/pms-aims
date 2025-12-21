@@ -11,7 +11,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { deleteItem } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Division, Office, School } from "@/types/database";
+import { Division, Office, School, User } from "@/types/database";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -21,6 +21,7 @@ import { AddModal } from "./AddModal";
 type ItemType = Office & {
   divisions?: Division | null;
   schools?: School | null;
+  head_user?: User | null;
 };
 const table = "offices";
 
@@ -72,26 +73,15 @@ export const List = ({}) => {
         <table className="app__table">
           <thead className="app__table_thead">
             <tr>
-              <th className="app__table_th">Code</th>
               <th className="app__table_th">Name</th>
               <th className="app__table_th">Type</th>
-              <th className="app__table_th">Division</th>
-              <th className="app__table_th">School</th>
+              <th className="app__table_th">Head of Office</th>
               <th className="app__table_th_right">Actions</th>
             </tr>
           </thead>
           <tbody className="app__table_tbody">
             {list.map((item: ItemType) => (
               <tr key={item.id} className="app__table_tr">
-                <td className="app__table_td">
-                  <div className="app__table_cell_content">
-                    <div className="app__table_cell_text">
-                      <div className="app__table_cell_title">
-                        {item.code || "-"}
-                      </div>
-                    </div>
-                  </div>
-                </td>
                 <td className="app__table_td">
                   <div className="app__table_cell_text">
                     <div className="app__table_cell_title">
@@ -107,19 +97,17 @@ export const List = ({}) => {
                   </span>
                 </td>
                 <td className="app__table_td">
-                  {item.divisions ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
-                      {item.divisions.name || item.divisions.code || "-"}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">-</span>
-                  )}
-                </td>
-                <td className="app__table_td">
-                  {item.schools ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
-                      {item.schools.name || item.schools.code || "-"}
-                    </span>
+                  {item.head_user ? (
+                    <div className="app__table_cell_text">
+                      <div className="app__table_cell_title">
+                        {item.head_user.name || "-"}
+                      </div>
+                      {item.head_user.email && (
+                        <div className="app__table_cell_subtitle">
+                          {item.head_user.email}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-muted-foreground text-sm">-</span>
                   )}

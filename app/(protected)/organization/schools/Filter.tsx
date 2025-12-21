@@ -65,7 +65,7 @@ export const Filter = ({
               <Input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Search by name or code..."
+                placeholder="Search by name, code, or school ID..."
                 className="pl-9 pr-9 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 w-full"
               />
               {keyword && (

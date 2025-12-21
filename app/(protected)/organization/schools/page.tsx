@@ -39,13 +39,15 @@ export default function Page() {
 
       let query = supabase
         .from("schools")
-        .select("*, divisions(id, code, name)", { count: "exact" })
+        .select("*, head_user:head_user_id(id, name, email)", {
+          count: "exact",
+        })
         .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID);
 
-      // Search in both name and code fields
+      // Search in name, code, and school_id fields
       if (filterKeyword) {
         query = query.or(
-          `name.ilike.%${filterKeyword}%,code.ilike.%${filterKeyword}%`
+          `name.ilike.%${filterKeyword}%,code.ilike.%${filterKeyword}%,school_id.ilike.%${filterKeyword}%`
         );
       }
 

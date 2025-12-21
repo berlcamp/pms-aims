@@ -31,6 +31,7 @@ export interface School {
   name: string;
   school_id?: string; // DepEd School ID
   address?: string;
+  head_user_id?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
