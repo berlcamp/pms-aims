@@ -12,14 +12,14 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { deleteItem } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Role, User } from "@/types"; // Import the RootState type
+import { Role, UserWithRelations } from "@/types/database";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { AddModal } from "./AddModal";
 
 // Always update this on other pages
-type ItemType = User;
+type ItemType = UserWithRelations;
 const table = "users";
 
 // Helper function to get initials from name
@@ -82,6 +82,8 @@ export const List = ({}) => {
             <tr>
               <th className="app__table_th">Name</th>
               <th className="app__table_th">Role</th>
+              <th className="app__table_th">School</th>
+              <th className="app__table_th">Office</th>
               <th className="app__table_th_right">Actions</th>
             </tr>
           </thead>
@@ -133,6 +135,20 @@ export const List = ({}) => {
                           </span>
                         ))}
                     </div>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">-</span>
+                  )}
+                </td>
+                <td className="app__table_td">
+                  {item.school ? (
+                    <span className="text-sm">{item.school.name}</span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">-</span>
+                  )}
+                </td>
+                <td className="app__table_td">
+                  {item.office ? (
+                    <span className="text-sm">{item.office.name}</span>
                   ) : (
                     <span className="text-muted-foreground text-sm">-</span>
                   )}

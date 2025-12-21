@@ -87,11 +87,17 @@ export interface RolePermission {
   created_at: string;
 }
 
+// Extended RolePermission with nested permission relationship (from Supabase queries)
+export interface RolePermissionWithPermission extends RolePermission {
+  permission?: Permission | null;
+}
+
 export interface User {
   id: string;
   user_id: string; // Supabase Auth user ID
   division_id?: string | null;
   school_id?: string | null;
+  office_id?: string | null;
   name: string;
   email: string;
   phone?: string;
@@ -113,6 +119,18 @@ export interface UserRole {
   assigned_by?: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+// Extended UserRole with nested roles relationship (from Supabase queries)
+export interface UserRoleWithRole extends UserRole {
+  roles?: Role | null;
+}
+
+// Extended User type with relationships (for queries that include joins)
+export interface UserWithRelations extends User {
+  user_roles?: UserRoleWithRole[];
+  school?: Pick<School, "id" | "name" | "code"> | null;
+  office?: Pick<Office, "id" | "name" | "code"> | null;
 }
 
 // ============================================================================

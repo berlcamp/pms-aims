@@ -21,11 +21,18 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAppDispatch } from "@/lib/redux/hook";
 import { addItem, updateList } from "@/lib/redux/listSlice";
 import { supabase2 } from "@/lib/supabase/admin";
 import { supabase } from "@/lib/supabase/client";
-import { Role, User } from "@/types";
+import { Office, Role, School, User } from "@/types/database";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -49,7 +56,9 @@ const FormSchema = z.object({
     .string()
     .min(1, "Email is required")
     .email("Please enter a valid email address"),
-  roleIds: z.array(z.number()).min(1, "At least one role must be selected"),
+  roleIds: z.array(z.string()).min(1, "At least one role must be selected"),
+  school_id: z.string().optional(),
+  office_id: z.string().optional(),
 });
 
 type FormType = z.infer<typeof FormSchema>;
@@ -58,15 +67,22 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
+  const [availableSchools, setAvailableSchools] = useState<School[]>([]);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const [availableOffices, setAvailableOffices] = useState<Office[]>([]);
+  const [loadingOffices, setLoadingOffices] = useState(false);
 
   const dispatch = useAppDispatch();
 
   const form = useForm<FormType>({
     resolver: zodResolver(FormSchema),
+    mode: "onSubmit", // Only validate on submit, not on change/blur
     defaultValues: {
       name: editData ? editData.name : "",
       email: editData ? editData.email : "",
       roleIds: [],
+      school_id: editData?.school_id ? String(editData.school_id) : "none",
+      office_id: editData?.office_id ? String(editData.office_id) : "none",
     },
   });
 
@@ -96,10 +112,75 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
     }
   }, [isOpen]);
 
-  // Fetch user roles when editing
+  // Fetch available schools
   useEffect(() => {
-    const fetchUserRoles = async () => {
-      if (editData?.id && isOpen) {
+    const fetchSchools = async () => {
+      setLoadingSchools(true);
+      try {
+        const { data, error } = await supabase
+          .from("schools")
+          .select("*")
+          .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID)
+          .eq("is_active", true)
+          .order("name");
+
+        if (error) throw error;
+        setAvailableSchools(data || []);
+      } catch (error) {
+        console.error("Error fetching schools:", error);
+        toast.error("Failed to load schools");
+      } finally {
+        setLoadingSchools(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchSchools();
+    }
+  }, [isOpen]);
+
+  // Fetch available offices
+  useEffect(() => {
+    const fetchOffices = async () => {
+      setLoadingOffices(true);
+      try {
+        const { data, error } = await supabase
+          .from("offices")
+          .select("*")
+          .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID)
+          .eq("is_active", true)
+          .order("name");
+
+        if (error) throw error;
+        setAvailableOffices(data || []);
+      } catch (error) {
+        console.error("Error fetching offices:", error);
+        toast.error("Failed to load offices");
+      } finally {
+        setLoadingOffices(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchOffices();
+    }
+  }, [isOpen]);
+
+  // Fetch user roles when editing and reset form
+  useEffect(() => {
+    const fetchUserRolesAndReset = async () => {
+      if (!isOpen) return;
+
+      // When editing, wait for roles to finish loading before resetting
+      // This ensures we can properly match fetched roleIds with available roles
+      if (editData?.id && loadingRoles) {
+        return; // Still loading roles, wait
+      }
+
+      let roleIds: string[] = [];
+
+      // Fetch user roles if editing
+      if (editData?.id) {
         try {
           const { data, error } = await supabase
             .from("user_roles")
@@ -108,16 +189,32 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
             .eq("is_active", true);
 
           if (error) throw error;
-          const roleIds = (data || []).map((ur) => ur.role_id);
-          form.setValue("roleIds", roleIds);
+          // Ensure roleIds are strings and filter to only include roles that exist in availableRoles
+          const fetchedRoleIds = (data || []).map((ur) => String(ur.role_id));
+          // Only include roleIds that exist in availableRoles to prevent validation errors
+          roleIds = fetchedRoleIds.filter((id) =>
+            availableRoles.some((role) => String(role.id) === id)
+          );
         } catch (error) {
           console.error("Error fetching user roles:", error);
         }
       }
+
+      // Reset form with fetched roles (or empty array for new user)
+      form.reset(
+        {
+          name: editData?.name || "",
+          email: editData?.email || "",
+          roleIds: roleIds,
+          school_id: editData?.school_id ? String(editData.school_id) : "none",
+          office_id: editData?.office_id ? String(editData.office_id) : "none",
+        },
+        { keepErrors: false } // Clear any validation errors
+      );
     };
 
-    fetchUserRoles();
-  }, [editData, isOpen, form]);
+    fetchUserRolesAndReset();
+  }, [editData, isOpen, form, availableRoles, loadingRoles]);
 
   // Submit handler
   const onSubmit = async (data: FormType) => {
@@ -160,6 +257,14 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
         email: data.email.trim().toLowerCase(),
         user_id,
         division_id: process.env.NEXT_PUBLIC_DIVISION_ID,
+        school_id:
+          data.school_id && data.school_id !== "none"
+            ? parseInt(data.school_id)
+            : null,
+        office_id:
+          data.office_id && data.office_id !== "none"
+            ? parseInt(data.office_id)
+            : null,
       };
 
       let userId: number;
@@ -278,16 +383,6 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      form.reset({
-        name: editData?.name || "",
-        email: editData?.email || "",
-        roleIds: [],
-      });
-    }
-  }, [form, editData, isOpen]);
-
   const handleClose = () => {
     if (!isSubmitting) {
       form.reset();
@@ -359,6 +454,66 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
 
             <FormField
               control={form.control}
+              name="school_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">School</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || "none"}
+                    disabled={isSubmitting || loadingSchools}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select a school (optional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {availableSchools.map((school) => (
+                        <SelectItem key={school.id} value={String(school.id)}>
+                          {school.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="office_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Office</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || "none"}
+                    disabled={isSubmitting || loadingOffices}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select an office (optional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {availableOffices.map((office) => (
+                        <SelectItem key={office.id} value={String(office.id)}>
+                          {office.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="roleIds"
               render={() => (
                 <FormItem>
@@ -394,17 +549,24 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
                                 >
                                   <FormControl>
                                     <Checkbox
-                                      checked={field.value?.includes(role.id)}
+                                      checked={field.value?.some(
+                                        (id) => String(id) === String(role.id)
+                                      )}
                                       onChange={(e) => {
                                         const checked = e.target.checked;
+                                        const roleIdString = String(role.id);
                                         return checked
                                           ? field.onChange([
-                                              ...(field.value || []),
-                                              role.id,
+                                              ...(field.value || []).filter(
+                                                (id) =>
+                                                  String(id) !== roleIdString
+                                              ),
+                                              roleIdString,
                                             ])
                                           : field.onChange(
                                               (field.value || []).filter(
-                                                (value) => value !== role.id
+                                                (id) =>
+                                                  String(id) !== roleIdString
                                               )
                                             );
                                       }}

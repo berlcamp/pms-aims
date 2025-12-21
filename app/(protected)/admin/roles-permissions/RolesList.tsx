@@ -13,7 +13,8 @@ import { PER_PAGE } from "@/lib/constants";
 import { useAppDispatch } from "@/lib/redux/hook";
 import { addList, deleteItem } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Role, RootState } from "@/types";
+import { RootState } from "@/types";
+import { Role } from "@/types/database";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -53,7 +54,7 @@ export const RolesList = () => {
     const fetchData = async () => {
       setLoading(true); // Set loading before clearing list
       dispatch(addList([])); // Reset the list
-      
+
       let query = supabase.from(table).select("*", { count: "exact" });
 
       if (filter.keyword) {

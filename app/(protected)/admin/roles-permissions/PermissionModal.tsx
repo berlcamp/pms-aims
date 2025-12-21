@@ -30,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppDispatch } from "@/lib/redux/hook";
 import { addItem, updateList } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Permission } from "@/types";
+import { Permission } from "@/types/database";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";

@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabase/client";
-import { Permission, Role, RolePermission } from "@/types";
+import { Permission, Role, RolePermission } from "@/types/database";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -11,7 +11,7 @@ export const RolePermissionsManager = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
-  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -70,7 +70,7 @@ export const RolePermissionsManager = () => {
   }, {} as Record<string, Permission[]>);
 
   const handlePermissionToggle = async (
-    permissionId: number,
+    permissionId: string,
     checked: boolean
   ) => {
     if (!selectedRoleId) {
@@ -97,9 +97,10 @@ export const RolePermissionsManager = () => {
           setRolePermissions([
             ...rolePermissions,
             {
-              id: Date.now(), // Temporary ID
+              id: String(Date.now()), // Temporary ID
               role_id: selectedRoleId,
               permission_id: permissionId,
+              created_at: new Date().toISOString(),
             } as RolePermission,
           ]);
         }
@@ -164,9 +165,10 @@ export const RolePermissionsManager = () => {
             ...toAdd.map(
               (p) =>
                 ({
-                  id: Date.now() + p.id, // Temporary ID
+                  id: String(Date.now()) + p.id, // Temporary ID
                   role_id: selectedRoleId,
                   permission_id: p.id,
+                  created_at: new Date().toISOString(),
                 } as RolePermission)
             ),
           ]);

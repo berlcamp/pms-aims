@@ -1,5 +1,5 @@
 // store/userSlice.ts
-import { Permission, UserRole } from "@/types";
+import { Permission, UserRole } from "@/types/database";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { User } from "@supabase/supabase-js";
 

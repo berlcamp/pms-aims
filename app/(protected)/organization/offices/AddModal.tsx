@@ -298,7 +298,7 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
                       </FormControl>
                       <SelectContent>
                         {availableSchools.length === 0 ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="placeholder-disabled" disabled>
                             {loadingSchools
                               ? "Loading schools..."
                               : !divisionId

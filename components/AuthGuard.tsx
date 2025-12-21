@@ -2,7 +2,11 @@
 
 import { setUser } from "@/lib/redux/userSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Permission, RolePermission, UserRole } from "@/types";
+import {
+  Permission,
+  RolePermissionWithPermission,
+  UserRole,
+} from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -78,8 +82,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           console.error("Failed to fetch permissions:", permissionsError);
         } else if (rolePermissions) {
           // Extract unique permissions
-          const permissionMap = new Map<number, Permission>();
-          (rolePermissions as RolePermission[]).forEach((rp) => {
+          const permissionMap = new Map<string, Permission>();
+          (rolePermissions as RolePermissionWithPermission[]).forEach((rp) => {
             if (rp.permission) {
               permissionMap.set(rp.permission.id, rp.permission);
             }

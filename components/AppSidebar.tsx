@@ -7,8 +7,8 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
+  ListCheck,
   Loader2,
-  Plus,
   School,
   Shield,
   User,
@@ -18,7 +18,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
@@ -91,12 +90,11 @@ export function AppSidebar() {
     },
   ];
 
-  // Projects (sample data - you can replace this with dynamic data)
-  const projects = [
+  const planningItems = [
     {
-      title: "Sample",
-      url: "/projects/sample",
-      color: "#d8a7f0", // Light purple color
+      title: "PPMP",
+      url: "/planning/ppmp",
+      icon: ListCheck,
     },
   ];
 
@@ -186,25 +184,19 @@ export function AppSidebar() {
         {/* Projects Section */}
         <SidebarGroup className="px-2 py-4 relative">
           <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white uppercase tracking-wider">
-            Projects
+            Procument Planning
           </SidebarGroupLabel>
-          <SidebarGroupAction
-            className="text-white hover:!bg-[#383838] hover:text-white"
-            aria-label="Add project"
-          >
-            <Plus className="h-4 w-4" />
-          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {projects.map((project) => {
-                const isActive = pathname === project.url;
-                const isLoading = loadingPath === project.url;
+              {planningItems.map((item) => {
+                const isActive = pathname === item.url;
+                const isLoading = loadingPath === item.url;
                 return (
-                  <SidebarMenuItem key={project.title}>
+                  <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
                       <Link
-                        href={project.url}
-                        onClick={() => handleLinkClick(project.url)}
+                        href={item.url}
+                        onClick={() => handleLinkClick(item.url)}
                         className={cn(
                           "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                           "hover:!bg-[#383838]",
@@ -215,12 +207,20 @@ export function AppSidebar() {
                             : "text-white/90 hover:text-white"
                         )}
                       >
-                        <div
-                          className="h-3 w-3 rounded-sm flex-shrink-0"
-                          style={{ backgroundColor: project.color }}
-                        />
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                        ) : (
+                          <item.icon
+                            className={cn(
+                              "h-4 w-4 transition-colors duration-200",
+                              isActive
+                                ? "text-white"
+                                : "text-white/70 group-hover:text-white"
+                            )}
+                          />
+                        )}
                         <span className="text-sm transition-colors duration-200">
-                          {project.title}
+                          {item.title}
                         </span>
                       </Link>
                     </SidebarMenuButton>
