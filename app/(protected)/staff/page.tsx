@@ -51,7 +51,7 @@ export default function Page() {
       let query = supabase
         .from("users")
         .select(
-          "*, user_roles!user_roles_user_id_fkey(roles(id, name, code, is_active)), school:school_id(id, name, code), office:office_id(id, name, code)",
+          "*, school:school_id(id, name, code), office:office_id(id, name, code)",
           { count: "exact" }
         )
         .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID);
@@ -88,7 +88,7 @@ export default function Page() {
     };
   }, [page, filterKeyword, dispatch]);
 
-  if (user?.type != "super admin") {
+  if (user?.type != "super admin" && user?.type != "admin") {
     return <Notfoundpage />;
   }
 

@@ -103,6 +103,7 @@ export interface User {
   phone?: string;
   position?: string;
   employee_id?: string;
+  type?: string; // User type: 'super admin', 'admin', 'staff', 'user'
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -124,6 +125,7 @@ export interface UserRole {
 // Extended UserRole with nested roles relationship (from Supabase queries)
 export interface UserRoleWithRole extends UserRole {
   roles?: Role | null;
+  role?: Role | null;
 }
 
 // Extended User type with relationships (for queries that include joins)
@@ -131,6 +133,7 @@ export interface UserWithRelations extends User {
   user_roles?: UserRoleWithRole[];
   school?: Pick<School, "id" | "name" | "code"> | null;
   office?: Pick<Office, "id" | "name" | "code"> | null;
+  permissions?: Permission[]; // User's permissions (flattened from role_permissions)
 }
 
 // ============================================================================
@@ -228,6 +231,171 @@ export interface ProposalItem {
   remarks?: string;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================================================
+// PPMP (PROCUREMENT PROGRAM AND MANAGEMENT PLAN)
+// ============================================================================
+
+export type PPMPType = "INDICATIVE" | "FINAL";
+export type PPMPStatus =
+  | "DRAFT"
+  | "FOR_APPROVAL"
+  | "APPROVED_BY_OFFICE"
+  | "SUBMITTED_TO_PROCUREMENT"
+  | "CONSOLIDATED"
+  | "RETURNED_FOR_REVISION";
+
+export type ProjectType = "GOODS" | "INFRASTRUCTURE" | "CONSULTING_SERVICES";
+export type ImplementationMode = "PROCUREMENT" | "BY_ADMINISTRATION";
+
+export type PPMPAttachmentType =
+  | "MARKET_SCOPING_CHECKLIST"
+  | "TECHNICAL_SPECIFICATIONS"
+  | "TOR"
+  | "ENGINEERING_PLANS"
+  | "FEASIBILITY_STUDY"
+  | "OTHER";
+
+export type PPMPApprovalAction = "approve" | "return" | "review" | "submit";
+
+export interface PPMP {
+  id: string;
+  ppmp_number: string;
+  fiscal_year: number;
+  ppmp_type: PPMPType;
+  version: number;
+  parent_ppmp_id?: string | null;
+  basis_of_revision?: string | null;
+  division_id: string;
+  office_id?: string | null;
+  school_id?: string | null;
+  project_title: string;
+  general_description: string;
+  objective: string;
+  implementation_mode: ImplementationMode;
+  project_type: ProjectType;
+  is_general_support_services: boolean;
+  suggested_mode_of_procurement?: string | null;
+  procurement_start_month?: number | null;
+  procurement_start_year?: number | null;
+  procurement_end_month?: number | null;
+  procurement_end_year?: number | null;
+  delivery_start_month?: number | null;
+  delivery_start_year?: number | null;
+  delivery_end_month?: number | null;
+  delivery_end_year?: number | null;
+  source_of_funds: string;
+  total_budget_amount: number;
+  estimated_budget?: number | null;
+  authorized_budget?: number | null;
+  budget_override_justification?: string | null;
+  status: PPMPStatus;
+  is_locked: boolean;
+  submitted_by?: string | null;
+  submitted_at?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  remarks?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+export interface PPMPLot {
+  id: string;
+  ppmp_id: string;
+  lot_number: number;
+  lot_name: string;
+  description?: string | null;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PPMPItem {
+  id: string;
+  ppmp_id: string;
+  lot_id?: string | null;
+  item_description: string;
+  unit_of_measure: string;
+  quantity: number;
+  size_specification?: string | null;
+  estimated_unit_cost: number;
+  estimated_total_cost: number;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PPMPAttachment {
+  id: string;
+  ppmp_id: string;
+  document_type: PPMPAttachmentType;
+  file_name: string;
+  file_url: string;
+  file_size?: number | null;
+  mime_type?: string | null;
+  uploaded_by?: string | null;
+  is_required: boolean;
+  uploaded_at: string;
+  created_at: string;
+}
+
+export interface PPMPApprovalHistory {
+  id: string;
+  ppmp_id: string;
+  action: PPMPApprovalAction;
+  acted_by: string;
+  acted_at: string;
+  remarks?: string | null;
+  previous_status?: string | null;
+  new_status: string;
+  created_at: string;
+}
+
+// Extended PPMP with relationships (for queries that include joins)
+export interface PPMPWithRelations extends PPMP {
+  lots?: PPMPLot[];
+  items?: PPMPItem[];
+  attachments?: PPMPAttachment[];
+  approval_history?: PPMPApprovalHistory[];
+  office?: Pick<Office, "id" | "name" | "code"> | null;
+  school?: Pick<School, "id" | "name" | "code"> | null;
+  submitted_by_user?: Pick<User, "id" | "name" | "email"> | null;
+  approved_by_user?: Pick<User, "id" | "name" | "email"> | null;
+}
+
+// ============================================================================
+// LASA (BUDGET VISIBILITY & PLANNING)
+// ============================================================================
+
+export type LasaRowType = "MANUAL" | "PPMP_PROJECT";
+
+export interface LasaRow {
+  id: string;
+  division_id: string;
+  fiscal_year: number;
+  row_type: LasaRowType;
+  office_id?: string | null;
+  proponent_id?: string | null;
+  project_title: string;
+  fund_source: string;
+  planned_amount: number;
+  saro_number?: string | null;
+  ppmp_version_id?: string | null;
+  is_locked: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Extended LASA row with relationships (for queries that include joins)
+export interface LasaRowWithRelations extends LasaRow {
+  office?: Pick<Office, "id" | "name" | "code"> | null;
+  proponent?: Pick<User, "id" | "name" | "email"> | null;
+  ppmp?: Pick<PPMP, "id" | "ppmp_number" | "project_title" | "status"> | null;
+  created_by_user?: Pick<User, "id" | "name" | "email"> | null;
 }
 
 // ============================================================================
@@ -712,6 +880,8 @@ export interface ProcurementDocument {
 // ============================================================================
 
 export type NotificationType =
+  | "proponent_assigned"
+  | "proponent_removed"
   | "approval_request"
   | "approval_approved"
   | "approval_rejected"
@@ -719,6 +889,9 @@ export type NotificationType =
   | "delivery_received"
   | "inspection_completed"
   | "payment_forwarded"
+  | "ppmp_submitted"
+  | "ppmp_approved"
+  | "ppmp_returned"
   | "system_alert";
 
 export interface Notification {
@@ -727,11 +900,13 @@ export interface Notification {
   type: NotificationType;
   title: string;
   message: string;
-  entity_type?: string | null;
+  entity_type?: string | null; // e.g., 'lasa_row', 'ppmp', 'purchase_request'
   entity_id?: string | null;
+  metadata?: Record<string, unknown> | null; // JSON metadata for flexible data
   is_read: boolean;
   read_at?: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 // ============================================================================
@@ -754,6 +929,16 @@ export interface Database {
   // Procurement Planning
   procurement_proposals: ProcurementProposal;
   proposal_items: ProposalItem;
+
+  // PPMP
+  ppmp: PPMP;
+  ppmp_lots: PPMPLot;
+  ppmp_items: PPMPItem;
+  ppmp_attachments: PPMPAttachment;
+  ppmp_approval_history: PPMPApprovalHistory;
+
+  // LASA
+  lasa_rows: LasaRow;
 
   // Pre-Procurement Evaluation
   pre_procurement_evaluations: PreProcurementEvaluation;

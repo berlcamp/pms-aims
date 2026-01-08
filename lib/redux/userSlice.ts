@@ -1,15 +1,22 @@
 // store/userSlice.ts
-import { Permission, UserRole } from "@/types/database";
+import { Permission, UserRole, UserRoleWithRole } from "@/types/database";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { User } from "@supabase/supabase-js";
 
-interface ExtendedUser extends User {
+export interface ExtendedUser extends User {
   system_user_id?: number;
   org_id?: number;
+  division_id?: string | null;
   type?: string;
   name?: string;
   roles?: UserRole[];
   permissions?: Permission[];
+  // Additional properties to match UserWithRelations
+  user_id?: string;
+  is_active?: boolean;
+  office_id?: string | null;
+  school_id?: string | null;
+  user_roles?: UserRoleWithRole[];
 }
 
 interface UserState {

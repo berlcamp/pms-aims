@@ -20,6 +20,7 @@ interface UserSelectProps {
   disabled?: boolean;
   placeholder?: string;
   divisionId?: string | null;
+  excludedTypes?: string[]; // User types to exclude from the list
 }
 
 export function UserSelect({
@@ -28,6 +29,7 @@ export function UserSelect({
   disabled = false,
   placeholder = "Select a user",
   divisionId,
+  excludedTypes = [],
 }: UserSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,6 +52,7 @@ export function UserSelect({
     const fetchUsers = async () => {
       if (!divisionId) {
         setUsers([]);
+        setLoading(false);
         return;
       }
 
@@ -62,6 +65,13 @@ export function UserSelect({
           .eq("is_active", true)
           .order("name")
           .limit(100); // Limit to 100 results for performance
+
+        // Exclude specific user types
+        if (excludedTypes.length > 0) {
+          excludedTypes.forEach((type) => {
+            query = query.neq("type", type);
+          });
+        }
 
         // Add search filter if query exists
         if (debouncedQuery.trim()) {
@@ -84,8 +94,12 @@ export function UserSelect({
 
     if (isOpen && divisionId) {
       fetchUsers();
+    } else if (isOpen && !divisionId) {
+      // Reset loading state when dropdown is open but no divisionId
+      setLoading(false);
+      setUsers([]);
     }
-  }, [isOpen, divisionId, debouncedQuery]);
+  }, [isOpen, divisionId, debouncedQuery, excludedTypes]);
 
   // Fetch selected user when value changes
   useEffect(() => {
@@ -122,43 +136,64 @@ export function UserSelect({
   };
 
   const handleClear = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     onChange(null);
     setSelectedUser(null);
     setSearchQuery("");
   };
 
+  const isButtonDisabled = disabled || !divisionId;
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={isOpen}
-          disabled={disabled || !divisionId}
-          className={cn(
-            "h-10 w-full justify-between font-normal",
-            !selectedUser && "text-muted-foreground"
-          )}
-        >
-          <span className="truncate">
-            {selectedUser
-              ? `${selectedUser.name}${
-                  selectedUser.email ? ` (${selectedUser.email})` : ""
-                }`
-              : placeholder}
-          </span>
-          <div className="flex items-center gap-1">
-            {selectedUser && (
-              <X
-                className="h-4 w-4 shrink-0 opacity-50 hover:opacity-100"
-                onClick={handleClear}
-              />
+      <div className="relative w-full">
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={isOpen}
+            disabled={isButtonDisabled}
+            className={cn(
+              "h-10 w-full justify-between font-normal",
+              !selectedUser && "text-muted-foreground"
             )}
-            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+          >
+            <span className="truncate">
+              {selectedUser
+                ? `${selectedUser.name}${
+                    selectedUser.email ? ` (${selectedUser.email})` : ""
+                  }`
+                : placeholder}
+            </span>
+            <div className="flex items-center gap-1">
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+            </div>
+          </Button>
+        </DropdownMenuTrigger>
+        {selectedUser && !disabled && (
+          <div
+            onClick={handleClear}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="absolute right-9 top-1/2 -translate-y-1/2 flex items-center justify-center rounded-sm opacity-50 hover:opacity-100 cursor-pointer z-10 h-4 w-4"
+            role="button"
+            tabIndex={0}
+            aria-label="Clear selection"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClear(e as unknown as React.MouseEvent);
+              }
+            }}
+          >
+            <X className="h-4 w-4 shrink-0" />
           </div>
-        </Button>
-      </DropdownMenuTrigger>
+        )}
+      </div>
       <DropdownMenuContent
         className="w-[var(--radix-dropdown-menu-trigger-width)] p-0"
         align="start"
@@ -197,7 +232,9 @@ export function UserSelect({
               <div className="p-4 text-center text-sm text-muted-foreground">
                 {debouncedQuery.trim()
                   ? "No users found"
-                  : "Start typing to search users"}
+                  : divisionId
+                  ? "No users available"
+                  : "Please select a division"}
               </div>
             ) : (
               <div className="p-1">

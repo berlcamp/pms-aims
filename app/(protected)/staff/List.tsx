@@ -12,7 +12,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { deleteItem } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { Role, UserWithRelations } from "@/types/database";
+import { UserWithRelations } from "@/types/database";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -108,33 +108,10 @@ export const List = ({}) => {
                   </div>
                 </td>
                 <td className="app__table_td">
-                  {item.user_roles && item.user_roles.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {Array.from(
-                        new Map(
-                          item.user_roles
-                            .filter(
-                              (userRole) => userRole.roles?.is_active !== false
-                            )
-                            .map((userRole) => [
-                              userRole.roles?.id,
-                              userRole.roles,
-                            ])
-                        ).values()
-                      )
-                        .filter(
-                          (role): role is Role =>
-                            role !== null && role !== undefined
-                        )
-                        .map((role, index) => (
-                          <span
-                            key={role.id || index}
-                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {role.name || "Unknown Role"}
-                          </span>
-                        ))}
-                    </div>
+                  {(item as any).type ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                      {(item as any).type.charAt(0).toUpperCase() + (item as any).type.slice(1)}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground text-sm">-</span>
                   )}

@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/hooks/use-theme";
 import { useAppSelector } from "@/lib/redux/hook";
-import { ChevronDown, LogOut, Moon, Sun } from "lucide-react";
+import { ChevronDown, ClipboardList, LogOut, Moon, Sun } from "lucide-react";
+import Link from "next/link";
 
 export default function HeaderDropdown() {
   const user = useAppSelector((state) => state.user.user);
@@ -104,6 +105,19 @@ export default function HeaderDropdown() {
                 <span>Dark Mode</span>
               </>
             )}
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          {/* Lasa Assignments */}
+          <DropdownMenuItem asChild>
+            <Link
+              href="/proponent-lasa"
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span>LASA Assignments</span>
+            </Link>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

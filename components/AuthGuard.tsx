@@ -2,11 +2,6 @@
 
 import { setUser } from "@/lib/redux/userSlice";
 import { supabase } from "@/lib/supabase/client";
-import {
-  Permission,
-  RolePermissionWithPermission,
-  UserRole,
-} from "@/types/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -46,66 +41,31 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Fetch user roles with role details
-      const { data: userRoles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select(
-          `
-          *,
-          role:roles(*)
-        `
-        )
-        .eq("user_id", systemUser.id)
-        .eq("is_active", true);
-
-      if (rolesError) {
-        console.error("Failed to fetch user roles:", rolesError);
-      }
-
-      // Fetch permissions for all user roles
-      let permissions: Permission[] = [];
-      const typedUserRoles: UserRole[] = (userRoles || []) as UserRole[];
-      if (typedUserRoles.length > 0) {
-        const roleIds = typedUserRoles.map((ur) => ur.role_id);
-        const { data: rolePermissions, error: permissionsError } =
-          await supabase
-            .from("role_permissions")
-            .select(
-              `
-            *,
-            permission:permissions(*)
-          `
-            )
-            .in("role_id", roleIds);
-
-        if (permissionsError) {
-          console.error("Failed to fetch permissions:", permissionsError);
-        } else if (rolePermissions) {
-          // Extract unique permissions
-          const permissionMap = new Map<string, Permission>();
-          (rolePermissions as RolePermissionWithPermission[]).forEach((rp) => {
-            if (rp.permission) {
-              permissionMap.set(rp.permission.id, rp.permission);
-            }
-          });
-          permissions = Array.from(permissionMap.values());
-        }
-      }
-
-      // Fetch locations the user is allowed to access
+      // Set user data
       try {
         dispatch(
           setUser({
             ...session.user,
             system_user_id: systemUser.id,
+            org_id: systemUser.org_id,
+            division_id: systemUser.division_id
+              ? String(systemUser.division_id)
+              : null,
+            type: (systemUser as any).type || "user",
             name: systemUser.name,
-            type: systemUser.type,
-            roles: typedUserRoles,
-            permissions: permissions,
+            // Additional properties
+            user_id: systemUser.user_id,
+            is_active: systemUser.is_active,
+            office_id: systemUser.office_id
+              ? String(systemUser.office_id)
+              : null,
+            school_id: systemUser.school_id
+              ? String(systemUser.school_id)
+              : null,
           })
         );
       } catch (error) {
-        console.error("Failed to load locations:", error);
+        console.error("Failed to set user:", error);
       }
 
       setLoading(false);

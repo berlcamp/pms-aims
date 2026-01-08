@@ -1,6 +1,7 @@
 "use client";
 
 import HeaderDropdown from "./HeaderDropdownMenu";
+import { NotificationBell } from "./NotificationBell";
 import { SidebarTrigger } from "./ui/sidebar";
 
 export default function StickyHeader() {
@@ -17,8 +18,11 @@ export default function StickyHeader() {
 
       <div className="flex-1"></div>
 
-      {/* Right section: Settings dropdown */}
-      <HeaderDropdown />
+      {/* Right section: Notification bell and Settings dropdown */}
+      <div className="flex items-center gap-2">
+        <NotificationBell />
+        <HeaderDropdown />
+      </div>
     </header>
   );
 }

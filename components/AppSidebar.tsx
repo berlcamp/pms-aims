@@ -1,16 +1,13 @@
 "use client";
 
 import {
-  Bell,
   Building2,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Home,
   ListCheck,
   Loader2,
   School,
-  Shield,
   User,
 } from "lucide-react";
 
@@ -27,15 +24,17 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { useAppSelector } from "@/lib/redux/hook";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NProgress from "nprogress";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
+  const user = useAppSelector((state) => state.user.user);
 
   // Check if we're on an organization submenu page
   const isOnOrganizationPage =
@@ -60,7 +59,7 @@ export function AppSidebar() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       setIsOrganizationOpen(true);
     }
-  }, [isOnOrganizationPage]);
+  }, [isOnOrganizationPage, isOrganizationOpen]);
 
   const handleLinkClick = (url: string) => {
     // Don't trigger if already on this page
@@ -78,39 +77,61 @@ export function AppSidebar() {
       url: "/home",
       icon: Home,
     },
-    {
-      title: "My tasks",
-      url: "/tasks",
-      icon: CheckCircle2,
-    },
-    {
-      title: "Inbox",
-      url: "/inbox",
-      icon: Bell,
-    },
   ];
 
-  const planningItems = [
-    {
-      title: "PPMP",
-      url: "/planning/ppmp",
-      icon: ListCheck,
-    },
-  ];
+  // Check if user can access LASA (Budget Officer functionality)
+  // Only budget officer can access LASA
+  const isBudgetOfficer = useMemo(() => {
+    if (!user) return false;
+    return user.type === "budget officer" || user.type === "super admin";
+  }, [user]);
+
+  const planningItems = useMemo(() => {
+    const items = [
+      {
+        title: "PPMP",
+        url: "/planning/ppmp",
+        icon: ListCheck,
+      },
+    ];
+
+    // Only show LASA if user has BUDGET_OFFICER role
+    if (isBudgetOfficer) {
+      items.push({
+        title: "LASA (Budget Visibility)",
+        url: "/planning/lasa",
+        icon: ListCheck,
+      });
+    }
+
+    return items;
+  }, [isBudgetOfficer]);
+
+  // Check if user can access User Accounts (Super Admin or Admin only)
+  const isAdminOrSuperAdmin = useMemo(() => {
+    if (!user) return false;
+    return user.type === "super admin" || user.type === "admin";
+  }, [user]);
 
   // Settings items
-  const settingItems = [
-    {
-      title: "User Accounts",
-      url: "/staff",
-      icon: User,
-    },
-    {
-      title: "Roles & Permissions",
-      url: "/admin/roles-permissions",
-      icon: Shield,
-    },
-  ];
+  const settingItems = useMemo(() => {
+    const items: Array<{
+      title: string;
+      url: string;
+      icon: typeof User;
+    }> = [];
+
+    // Only show User Accounts if user is super admin or admin
+    if (isAdminOrSuperAdmin) {
+      items.push({
+        title: "User Accounts",
+        url: "/staff",
+        icon: User,
+      });
+    }
+
+    return items;
+  }, [isAdminOrSuperAdmin]);
 
   // Organization submenu items
   const organizationSubItems = [
