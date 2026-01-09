@@ -290,6 +290,7 @@ export interface PPMP {
   estimated_budget?: number | null;
   authorized_budget?: number | null;
   budget_override_justification?: string | null;
+  lasa_id?: string | null;
   status: PPMPStatus;
   is_locked: boolean;
   submitted_by?: string | null;

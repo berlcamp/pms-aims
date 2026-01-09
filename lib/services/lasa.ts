@@ -268,15 +268,12 @@ export async function createLasaRowFromPPMP(ppmp: PPMP): Promise<LasaRow> {
 
 /**
  * Get LASA rows for PPMP creation visibility
- * Returns MANUAL rows for the given fiscal year and fund source
+ * Returns MANUAL rows where the user is the proponent
  */
-export async function getLasaRowsForPPMPCreation(filters: {
-  divisionId: string;
-  fiscalYear: number;
-  fundSource?: string;
-  officeId?: string | null;
-}): Promise<LasaRowWithRelations[]> {
-  let query = supabase
+export async function getLasaRowsForPPMPCreation(
+  proponentId: string
+): Promise<LasaRowWithRelations[]> {
+  const { data, error } = await supabase
     .from("lasa_rows")
     .select(
       `
@@ -285,23 +282,9 @@ export async function getLasaRowsForPPMPCreation(filters: {
       proponent:users!lasa_rows_proponent_id_fkey(id, name, email)
     `
     )
-    .eq("division_id", parseInt(filters.divisionId))
-    .eq("fiscal_year", filters.fiscalYear)
     .eq("row_type", "MANUAL")
+    .eq("proponent_id", parseInt(proponentId))
     .order("created_at", { ascending: false });
-
-  if (filters.fundSource) {
-    query = query.eq("fund_source", filters.fundSource);
-  }
-
-  if (filters.officeId) {
-    query = query.eq("office_id", parseInt(filters.officeId));
-  } else {
-    // Include rows with no office_id (division-level)
-    query = query.or("office_id.is.null");
-  }
-
-  const { data, error } = await query;
 
   if (error) {
     throw new Error(
@@ -310,53 +293,4 @@ export async function getLasaRowsForPPMPCreation(filters: {
   }
 
   return (data || []) as LasaRowWithRelations[];
-}
-
-/**
- * Check if user can create LASA rows
- */
-export async function canCreateLasaRow(userId: string): Promise<boolean> {
-  // This is a simple check - full permission check should be done in UI layer
-  // using checkLasaCreatePermission from lasa-permissions.ts
-  return true; // Placeholder - actual check done via permissions utility
-}
-
-/**
- * Check if user can edit LASA row
- */
-export async function canEditLasaRow(
-  lasaRow: LasaRow,
-  userId: string
-): Promise<boolean> {
-  // Cannot edit PPMP_PROJECT rows
-  if (lasaRow.row_type === "PPMP_PROJECT") {
-    return false;
-  }
-
-  // Cannot edit locked rows
-  if (lasaRow.is_locked) {
-    return false;
-  }
-
-  return true; // Placeholder - actual check done via permissions utility
-}
-
-/**
- * Check if user can delete LASA row
- */
-export async function canDeleteLasaRow(
-  lasaRow: LasaRow,
-  userId: string
-): Promise<boolean> {
-  // Cannot delete PPMP_PROJECT rows
-  if (lasaRow.row_type === "PPMP_PROJECT") {
-    return false;
-  }
-
-  // Cannot delete locked rows
-  if (lasaRow.is_locked) {
-    return false;
-  }
-
-  return true; // Placeholder - actual check done via permissions utility
 }

@@ -57,6 +57,7 @@ export async function createPPMP(data: {
   estimatedBudget?: number;
   authorizedBudget?: number;
   budgetOverrideJustification?: string;
+  lasaId?: string;
   remarks?: string;
   submittedBy: string;
   lots?: Array<{ lotName: string; description?: string }>;
@@ -128,6 +129,7 @@ export async function createPPMP(data: {
     estimated_budget: data.estimatedBudget || null,
     authorized_budget: data.authorizedBudget || null,
     budget_override_justification: data.budgetOverrideJustification || null,
+    lasa_id: data.lasaId ? parseInt(data.lasaId) : null,
     status: "DRAFT" as PPMPStatus,
     is_locked: false,
     submitted_by: parseInt(data.submittedBy),
@@ -252,6 +254,17 @@ export async function updatePPMP(
   const updateData: any = { ...data };
   delete updateData.lots;
   delete updateData.items;
+  
+  // Convert string IDs to integers for database
+  if (updateData.office_id && typeof updateData.office_id === "string") {
+    updateData.office_id = parseInt(updateData.office_id);
+  }
+  if (updateData.school_id && typeof updateData.school_id === "string") {
+    updateData.school_id = parseInt(updateData.school_id);
+  }
+  if (updateData.lasa_id && typeof updateData.lasa_id === "string") {
+    updateData.lasa_id = parseInt(updateData.lasa_id);
+  }
 
   const { data: ppmp, error: ppmpError } = await supabase
     .from("ppmp")

@@ -3,6 +3,13 @@
 import { FileUpload, UploadedFile } from "@/components/ppmp/FileUpload";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,6 +36,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Stepper, StepperStep } from "@/components/ui/stepper";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { getLasaRowsForPPMPCreation } from "@/lib/services/lasa";
 import { createPPMP, submitPPMP, updatePPMP } from "@/lib/services/ppmp";
@@ -41,7 +56,16 @@ import {
   User,
 } from "@/types/database";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Calculator,
+  Calendar,
+  Clock,
+  Package,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -60,7 +84,6 @@ const step1Schema = z.object({
   projectTitle: z.string().min(1, "Project title is required"),
   generalDescription: z.string().min(1, "General description is required"),
   objective: z.string().min(1, "Objective is required"),
-  implementationMode: z.enum(["PROCUREMENT", "BY_ADMINISTRATION"]),
   projectType: z.enum(["GOODS", "INFRASTRUCTURE", "CONSULTING_SERVICES"]),
 });
 
@@ -89,29 +112,63 @@ const step4Schema = z
     deliveryEndMonth: z.number().min(1).max(12).optional(),
     deliveryEndYear: z.number().min(2020).max(2100).optional(),
   })
-  .refine(
-    (data) => {
-      if (data.procurementStartYear && data.procurementEndYear) {
-        if (data.procurementStartYear > data.procurementEndYear) return false;
-        if (
-          data.procurementStartYear === data.procurementEndYear &&
-          data.procurementStartMonth &&
-          data.procurementEndMonth &&
-          data.procurementStartMonth > data.procurementEndMonth
-        ) {
-          return false;
-        }
+  .superRefine((data, ctx) => {
+    // Validate procurement dates - only validate if both start and end years are provided
+    if (
+      data.procurementStartYear !== undefined &&
+      data.procurementEndYear !== undefined
+    ) {
+      if (data.procurementStartYear > data.procurementEndYear) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Procurement end date must be after start date",
+          path: ["procurementEndYear"],
+        });
+      } else if (
+        data.procurementStartYear === data.procurementEndYear &&
+        data.procurementStartMonth !== undefined &&
+        data.procurementEndMonth !== undefined &&
+        data.procurementStartMonth > data.procurementEndMonth
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Procurement end date must be after start date",
+          path: ["procurementEndYear"],
+        });
       }
-      return true;
-    },
-    { message: "Procurement end date must be after start date" }
-  );
+    }
+    // Validate delivery dates - only validate if both start and end years are provided
+    if (
+      data.deliveryStartYear !== undefined &&
+      data.deliveryEndYear !== undefined
+    ) {
+      if (data.deliveryStartYear > data.deliveryEndYear) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Delivery end date must be after start date",
+          path: ["deliveryEndYear"],
+        });
+      } else if (
+        data.deliveryStartYear === data.deliveryEndYear &&
+        data.deliveryStartMonth !== undefined &&
+        data.deliveryEndMonth !== undefined &&
+        data.deliveryStartMonth > data.deliveryEndMonth
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Delivery end date must be after start date",
+          path: ["deliveryEndYear"],
+        });
+      }
+    }
+  });
 
 // Form Schema for Step 5
 const step5Schema = z.object({
   sourceOfFunds: z.string().min(1, "Source of funds is required"),
   totalBudgetAmount: z.number().min(0.01, "Budget must be greater than 0"),
   budgetOverrideJustification: z.string().optional(),
+  lasaId: z.string().optional(),
 });
 
 // Form Schema for Step 6 (Attachments handled separately)
@@ -173,7 +230,6 @@ export function CreateWizard({
       projectTitle: "",
       generalDescription: "",
       objective: "",
-      implementationMode: "PROCUREMENT",
       projectType: "GOODS",
     },
   });
@@ -198,6 +254,7 @@ export function CreateWizard({
     defaultValues: {
       sourceOfFunds: "",
       totalBudgetAmount: 0,
+      lasaId: undefined,
     },
     mode: "onChange",
   });
@@ -263,7 +320,6 @@ export function CreateWizard({
         projectTitle: editData.project_title,
         generalDescription: editData.general_description,
         objective: editData.objective,
-        implementationMode: editData.implementation_mode,
         projectType: editData.project_type,
       });
 
@@ -285,12 +341,46 @@ export function CreateWizard({
         totalBudgetAmount: editData.total_budget_amount,
         budgetOverrideJustification:
           editData.budget_override_justification || undefined,
+        lasaId: editData.lasa_id ? String(editData.lasa_id) : undefined,
       });
 
       step7Form.reset({
         remarks: editData.remarks || undefined,
         basisOfRevision: editData.basis_of_revision || undefined,
       });
+
+      // Load items
+      if (editData.items && editData.items.length > 0) {
+        const loadedItems: ItemFormData[] = editData.items.map((item) => ({
+          itemDescription: item.item_description,
+          unitOfMeasure: item.unit_of_measure,
+          quantity: item.quantity,
+          sizeSpecification: item.size_specification || "",
+          estimatedUnitCost: item.estimated_unit_cost,
+          estimatedTotalCost: item.estimated_total_cost,
+        }));
+        setItems(loadedItems);
+      } else {
+        setItems([]);
+      }
+
+      // Load attachments
+      if (editData.attachments && editData.attachments.length > 0) {
+        const loadedAttachments: UploadedFile[] = editData.attachments.map(
+          (att) => ({
+            id: att.id,
+            documentType: att.document_type,
+            fileName: att.file_name,
+            fileUrl: att.file_url,
+            fileSize: att.file_size || undefined,
+            mimeType: att.mime_type || undefined,
+            isRequired: att.is_required,
+          })
+        );
+        setAttachments(loadedAttachments);
+      } else {
+        setAttachments([]);
+      }
 
       setPpmpId(editData.id);
     } else {
@@ -306,28 +396,17 @@ export function CreateWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editData, isOpen]);
 
-  // Fetch LASA rows when fiscal year and fund source are available
+  // Fetch LASA rows for the current user (proponent)
   useEffect(() => {
     const fetchLasaRows = async () => {
-      const step1Data = step1Form.getValues();
-      const step5Data = step5Form.getValues();
-      const fiscalYear = step1Data.fiscalYear;
-      const fundSource = step5Data.sourceOfFunds;
-      const officeId = user?.office_id ? String(user.office_id) : null;
-
-      if (!fiscalYear || !fundSource || !user?.division_id) {
+      if (!user?.id) {
         setLasaRows([]);
         return;
       }
 
       setLoadingLasa(true);
       try {
-        const rows = await getLasaRowsForPPMPCreation({
-          divisionId: String(user.division_id),
-          fiscalYear,
-          fundSource,
-          officeId: officeId || null,
-        });
+        const rows = await getLasaRowsForPPMPCreation(String(user.id));
         setLasaRows(rows);
       } catch (error) {
         console.error("Error fetching LASA rows:", error);
@@ -340,13 +419,7 @@ export function CreateWizard({
     if (isOpen) {
       fetchLasaRows();
     }
-  }, [
-    isOpen,
-    step1Form.watch("fiscalYear"),
-    step5Form.watch("sourceOfFunds"),
-    user?.division_id,
-    user?.office_id,
-  ]);
+  }, [isOpen, user?.id]);
 
   // Calculate total budget from items
   useEffect(() => {
@@ -361,6 +434,9 @@ export function CreateWizard({
     switch (currentStep) {
       case 0:
         isValid = await step1Form.trigger();
+        if (!isValid) {
+          toast.error("Please complete all required fields in Step 1");
+        }
         break;
       case 1:
         // Validate items
@@ -372,9 +448,23 @@ export function CreateWizard({
         break;
       case 2:
         isValid = await step4Form.trigger();
+        if (!isValid) {
+          const errors = step4Form.formState.errors;
+          const errorMessages = Object.values(errors)
+            .map((error) => error?.message)
+            .filter((msg): msg is string => typeof msg === "string");
+          if (errorMessages.length > 0) {
+            toast.error(errorMessages[0]);
+          } else {
+            toast.error("Please check the form for validation errors");
+          }
+        }
         break;
       case 3:
         isValid = await step5Form.trigger();
+        if (!isValid) {
+          toast.error("Please complete all required fields in Step 4");
+        }
         break;
       case 4:
         // Check for required Market Scoping Checklist
@@ -411,70 +501,6 @@ export function CreateWizard({
     }
   };
 
-  const handleSaveDraft = async () => {
-    if (!user) {
-      toast.error("User not found");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const step1Data = step1Form.getValues();
-      const step4Data = step4Form.getValues();
-      const step5Data = step5Form.getValues();
-      const step7Data = step7Form.getValues();
-
-      // Determine office/school
-      const officeId = user.office_id ? String(user.office_id) : null;
-      const schoolId = user.school_id ? String(user.school_id) : null;
-
-      const ppmpData = {
-        fiscalYear: step1Data.fiscalYear,
-        officeId,
-        schoolId,
-        projectTitle: step1Data.projectTitle,
-        generalDescription: step1Data.generalDescription,
-        objective: step1Data.objective,
-        implementationMode: step1Data.implementationMode,
-        projectType: step1Data.projectType,
-        suggestedModeOfProcurement: step4Data.suggestedModeOfProcurement,
-        procurementStartMonth: step4Data.procurementStartMonth,
-        procurementStartYear: step4Data.procurementStartYear,
-        procurementEndMonth: step4Data.procurementEndMonth,
-        procurementEndYear: step4Data.procurementEndYear,
-        deliveryStartMonth: step4Data.deliveryStartMonth,
-        deliveryStartYear: step4Data.deliveryStartYear,
-        deliveryEndMonth: step4Data.deliveryEndMonth,
-        deliveryEndYear: step4Data.deliveryEndYear,
-        sourceOfFunds: step5Data.sourceOfFunds,
-        totalBudgetAmount: step5Data.totalBudgetAmount,
-        budgetOverrideJustification: step5Data.budgetOverrideJustification,
-        remarks: step7Data.remarks,
-        submittedBy: String(user.id),
-        items,
-      };
-
-      if (ppmpId && editData) {
-        await updatePPMP(ppmpId, ppmpData);
-        toast.success("PPMP draft updated successfully");
-      } else {
-        const newPPMP = await createPPMP(ppmpData);
-        setPpmpId(newPPMP.id);
-        toast.success("PPMP draft saved successfully");
-      }
-
-      onSubmitComplete?.();
-      onClose();
-    } catch (error) {
-      console.error("Save error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save draft"
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleSubmit = async () => {
     if (!user) {
       toast.error("User not found");
@@ -497,7 +523,48 @@ export function CreateWizard({
       return;
     }
 
-    const hasMarketScoping = attachments.some(
+    // Check attachments from database if PPMP exists, otherwise use state
+    let currentAttachments = attachments;
+    if (ppmpId) {
+      try {
+        const { data: dbAttachments } = await supabase
+          .from("ppmp_attachments")
+          .select("*")
+          .eq("ppmp_id", ppmpId);
+
+        if (dbAttachments && dbAttachments.length > 0) {
+          // Merge database attachments with state attachments (state takes precedence for new uploads)
+          const dbAttachmentsMap = new Map(
+            dbAttachments.map((att) => [att.file_url, att])
+          );
+          const stateAttachmentsMap = new Map(
+            attachments.map((att) => [att.fileUrl, att])
+          );
+
+          // Combine: state attachments override DB attachments, then add any DB-only attachments
+          const combined = [
+            ...Array.from(stateAttachmentsMap.values()),
+            ...Array.from(dbAttachmentsMap.values())
+              .filter((dbAtt) => !stateAttachmentsMap.has(dbAtt.file_url))
+              .map((dbAtt) => ({
+                id: dbAtt.id,
+                documentType: dbAtt.document_type,
+                fileName: dbAtt.file_name,
+                fileUrl: dbAtt.file_url,
+                fileSize: dbAtt.file_size || undefined,
+                mimeType: dbAtt.mime_type || undefined,
+                isRequired: dbAtt.is_required,
+              })),
+          ];
+          currentAttachments = combined;
+        }
+      } catch (error) {
+        console.error("Error fetching attachments:", error);
+        // Fall back to state if DB fetch fails
+      }
+    }
+
+    const hasMarketScoping = currentAttachments.some(
       (a) => a.documentType === "MARKET_SCOPING_CHECKLIST"
     );
     if (!hasMarketScoping) {
@@ -507,25 +574,148 @@ export function CreateWizard({
 
     setIsSubmitting(true);
     try {
-      // Save PPMP first
-      await handleSaveDraft();
+      const step1Data = step1Form.getValues();
+      const step4Data = step4Form.getValues();
+      const step5Data = step5Form.getValues();
+      const step7Data = step7Form.getValues();
 
-      if (!ppmpId) {
+      // Determine office/school
+      const officeId = user.office_id ? String(user.office_id) : null;
+      const schoolId = user.school_id ? String(user.school_id) : null;
+
+      const ppmpData = {
+        fiscalYear: step1Data.fiscalYear,
+        officeId,
+        schoolId,
+        projectTitle: step1Data.projectTitle,
+        generalDescription: step1Data.generalDescription,
+        objective: step1Data.objective,
+        implementationMode: "PROCUREMENT", // Default value since field is removed
+        projectType: step1Data.projectType,
+        suggestedModeOfProcurement: step4Data.suggestedModeOfProcurement,
+        procurementStartMonth: step4Data.procurementStartMonth,
+        procurementStartYear: step4Data.procurementStartYear,
+        procurementEndMonth: step4Data.procurementEndMonth,
+        procurementEndYear: step4Data.procurementEndYear,
+        deliveryStartMonth: step4Data.deliveryStartMonth,
+        deliveryStartYear: step4Data.deliveryStartYear,
+        deliveryEndMonth: step4Data.deliveryEndMonth,
+        deliveryEndYear: step4Data.deliveryEndYear,
+        sourceOfFunds: step5Data.sourceOfFunds,
+        totalBudgetAmount: step5Data.totalBudgetAmount,
+        budgetOverrideJustification: step5Data.budgetOverrideJustification,
+        lasaId: step5Data.lasaId,
+        remarks: step7Data.remarks,
+        submittedBy: String(user.id),
+        items,
+      };
+
+      let finalPpmpId = ppmpId;
+
+      if (ppmpId && editData) {
+        // Convert camelCase to snake_case for updatePPMP
+        const updateData: {
+          fiscal_year?: number;
+          office_id?: string | null;
+          school_id?: string | null;
+          project_title?: string;
+          general_description?: string;
+          objective?: string;
+          project_type?: string;
+          suggested_mode_of_procurement?: string | null;
+          procurement_start_month?: number | null;
+          procurement_start_year?: number | null;
+          procurement_end_month?: number | null;
+          procurement_end_year?: number | null;
+          delivery_start_month?: number | null;
+          delivery_start_year?: number | null;
+          delivery_end_month?: number | null;
+          delivery_end_year?: number | null;
+          source_of_funds?: string;
+          total_budget_amount?: number;
+          budget_override_justification?: string | null;
+          lasa_id?: string | null;
+          remarks?: string | null;
+          items?: typeof items;
+        } = {
+          fiscal_year: step1Data.fiscalYear,
+          office_id: officeId || null,
+          school_id: schoolId || null,
+          project_title: step1Data.projectTitle,
+          general_description: step1Data.generalDescription,
+          objective: step1Data.objective,
+          project_type: step1Data.projectType,
+          suggested_mode_of_procurement:
+            step4Data.suggestedModeOfProcurement || null,
+          procurement_start_month: step4Data.procurementStartMonth || null,
+          procurement_start_year: step4Data.procurementStartYear || null,
+          procurement_end_month: step4Data.procurementEndMonth || null,
+          procurement_end_year: step4Data.procurementEndYear || null,
+          delivery_start_month: step4Data.deliveryStartMonth || null,
+          delivery_start_year: step4Data.deliveryStartYear || null,
+          delivery_end_month: step4Data.deliveryEndMonth || null,
+          delivery_end_year: step4Data.deliveryEndYear || null,
+          source_of_funds: step5Data.sourceOfFunds,
+          total_budget_amount: step5Data.totalBudgetAmount,
+          budget_override_justification:
+            step5Data.budgetOverrideJustification || null,
+          lasa_id: step5Data.lasaId || null,
+          remarks: step7Data.remarks || null,
+          items,
+        };
+        await updatePPMP(
+          ppmpId,
+          updateData as Parameters<typeof updatePPMP>[1]
+        );
+      } else {
+        const newPPMP = await createPPMP(ppmpData);
+        finalPpmpId = newPPMP.id;
+        setPpmpId(newPPMP.id);
+      }
+
+      if (!finalPpmpId) {
         toast.error("PPMP ID not found");
         return;
       }
 
-      // Upload attachments
+      // Save attachments that don't have an ID yet (for new PPMPs)
       for (const attachment of attachments) {
         if (!attachment.id) {
-          // New attachment, upload to storage and save to DB
-          // This would require the file object, so we'll handle it differently
-          // For now, assume attachments are already uploaded
+          try {
+            const { data, error } = await supabase
+              .from("ppmp_attachments")
+              .insert({
+                ppmp_id: parseInt(finalPpmpId),
+                document_type: attachment.documentType,
+                file_name: attachment.fileName,
+                file_url: attachment.fileUrl,
+                file_size: attachment.fileSize,
+                mime_type: attachment.mimeType,
+                is_required: attachment.isRequired,
+                uploaded_by: user?.id ? parseInt(String(user.id)) : null,
+              })
+              .select("id")
+              .single();
+
+            if (!error && data) {
+              // Update the attachment in state with the new ID
+              setAttachments((prev) =>
+                prev.map((att) =>
+                  att.fileUrl === attachment.fileUrl
+                    ? { ...att, id: data.id }
+                    : att
+                )
+              );
+            }
+          } catch (error) {
+            console.error("Failed to save attachment:", error);
+            // Continue with other attachments even if one fails
+          }
         }
       }
 
       // Submit PPMP
-      await submitPPMP(ppmpId);
+      await submitPPMP(finalPpmpId);
       toast.success("PPMP submitted for approval successfully");
       onSubmitComplete?.();
       onClose();
@@ -561,38 +751,69 @@ export function CreateWizard({
   const renderStep1 = () => (
     <div className="space-y-4">
       <Form {...step1Form}>
-        <FormField
-          control={step1Form.control}
-          name="fiscalYear"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Fiscal Year <span className="text-red-500">*</span>
-              </FormLabel>
-              <Select
-                onValueChange={(value) => field.onChange(parseInt(value))}
-                value={String(field.value)}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {Array.from({ length: 10 }, (_, i) => {
-                    const year = new Date().getFullYear() - i;
-                    return (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={step1Form.control}
+            name="fiscalYear"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Fiscal Year <span className="text-red-500">*</span>
+                </FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(parseInt(value))}
+                  value={String(field.value)}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const year = new Date().getFullYear() - i;
+                      return (
+                        <SelectItem key={year} value={String(year)}>
+                          {year}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={step1Form.control}
+            name="projectType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Project Type <span className="text-red-500">*</span>
+                </FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="GOODS">Goods</SelectItem>
+                    <SelectItem value="INFRASTRUCTURE">
+                      Infrastructure
+                    </SelectItem>
+                    <SelectItem value="CONSULTING_SERVICES">
+                      Consulting Services
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={step1Form.control}
@@ -610,98 +831,47 @@ export function CreateWizard({
           )}
         />
 
-        <FormField
-          control={step1Form.control}
-          name="generalDescription"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                General Description <span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  placeholder="Enter general description of the project"
-                  rows={4}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={step1Form.control}
-          name="objective"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Objective <span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  placeholder="Enter objective of the project"
-                  rows={4}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={step1Form.control}
-          name="implementationMode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Implementation Mode <span className="text-red-500">*</span>
-              </FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={step1Form.control}
+            name="generalDescription"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  General Description <span className="text-red-500">*</span>
+                </FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <Textarea
+                    {...field}
+                    placeholder="Enter general description of the project"
+                    rows={3}
+                  />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="PROCUREMENT">Procurement</SelectItem>
-                  <SelectItem value="BY_ADMINISTRATION">
-                    By Administration
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={step1Form.control}
-          name="projectType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Project Type <span className="text-red-500">*</span>
-              </FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+          <FormField
+            control={step1Form.control}
+            name="objective"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Objective <span className="text-red-500">*</span>
+                </FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <Textarea
+                    {...field}
+                    placeholder="Enter objective of the project"
+                    rows={3}
+                  />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="GOODS">Goods</SelectItem>
-                  <SelectItem value="INFRASTRUCTURE">Infrastructure</SelectItem>
-                  <SelectItem value="CONSULTING_SERVICES">
-                    Consulting Services
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         {/* Auto-generated fields display */}
         <div className="pt-4 border-t space-y-2">
@@ -779,105 +949,192 @@ export function CreateWizard({
     };
 
     return (
-      <div className="space-y-4">
-        <div className="sticky top-0 z-10 bg-background pb-2 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Items</h3>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                setEditingItemIndex(null);
-                setShowAddItemModal(true);
-              }}
-            >
-              Add Item
-            </Button>
+      <div className="space-y-6">
+        {/* Header Section */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Itemization
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add items to be procured for this project
+            </p>
           </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingItemIndex(null);
+              setShowAddItemModal(true);
+            }}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Item
+          </Button>
         </div>
 
-        {/* Items List */}
+        {/* Items Table */}
         {items.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Items ({items.length})</p>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {items.map((item, index) => (
-                <div
-                  key={index}
-                  className="p-3 border rounded-lg flex items-start justify-between"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{item.itemDescription}</p>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      <span>
-                        {item.quantity} {item.unitOfMeasure}
-                      </span>
-                      {item.sizeSpecification && (
-                        <span className="ml-2">• {item.sizeSpecification}</span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium mt-1">
-                      {new Intl.NumberFormat("en-PH", {
-                        style: "currency",
-                        currency: "PHP",
-                      }).format(item.estimatedTotalCost)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditItem(index)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteItem(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">
+                  Items ({items.length})
+                </CardTitle>
+                <span className="text-sm text-muted-foreground">
+                  Total:{" "}
+                  {new Intl.NumberFormat("en-PH", {
+                    style: "currency",
+                    currency: "PHP",
+                  }).format(calculateTotal())}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]">#</TableHead>
+                      <TableHead>Item Description</TableHead>
+                      <TableHead className="w-[120px]">Quantity</TableHead>
+                      <TableHead className="w-[120px]">Unit</TableHead>
+                      <TableHead className="w-[150px]">Unit Cost</TableHead>
+                      <TableHead className="w-[150px]">Total Cost</TableHead>
+                      <TableHead className="w-[100px] text-right">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item, index) => (
+                      <TableRow key={index} className="group">
+                        <TableCell className="font-medium text-muted-foreground">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">
+                              {item.itemDescription}
+                            </p>
+                            {item.sizeSpecification && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {item.sizeSpecification}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {item.quantity.toLocaleString("en-PH", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {item.unitOfMeasure}
+                        </TableCell>
+                        <TableCell>
+                          {new Intl.NumberFormat("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                            minimumFractionDigits: 2,
+                          }).format(item.estimatedUnitCost)}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {new Intl.NumberFormat("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                            minimumFractionDigits: 2,
+                          }).format(item.estimatedTotalCost)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEditItem(index)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteItem(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+            <div className="px-6 pb-6 pt-4 border-t bg-muted/30">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Total Budget:
+                </span>
+                <span className="text-xl font-bold">
+                  {new Intl.NumberFormat("en-PH", {
+                    style: "currency",
+                    currency: "PHP",
+                    minimumFractionDigits: 2,
+                  }).format(calculateTotal())}
+                </span>
+              </div>
             </div>
-          </div>
+          </Card>
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No items added yet</p>
-            <p className="text-sm">Click &quot;Add Item&quot; to get started</p>
-          </div>
-        )}
-
-        {/* Summary */}
-        {items.length > 0 && (
-          <div className="pt-4 border-t">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Total Budget:</span>
-              <span className="text-lg font-bold">
-                {new Intl.NumberFormat("en-PH", {
-                  style: "currency",
-                  currency: "PHP",
-                }).format(calculateTotal())}
-              </span>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <div className="rounded-full bg-muted p-4 mb-4">
+                <Package className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h4 className="font-semibold mb-1">No items added yet</h4>
+              <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
+                Start building your procurement list by adding items to be
+                procured
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditingItemIndex(null);
+                  setShowAddItemModal(true);
+                }}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Your First Item
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Add Item Modal */}
         {showAddItemModal && (
           <Dialog open={showAddItemModal} onOpenChange={setShowAddItemModal}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl max-h-[90vh]">
               <DialogHeader>
-                <DialogTitle>
-                  {editingItemIndex !== null ? "Edit Item" : "Add Item"}
+                <DialogTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  {editingItemIndex !== null ? "Edit Item" : "Add New Item"}
                 </DialogTitle>
+                <DialogDescription>
+                  {editingItemIndex !== null
+                    ? "Update the item details below"
+                    : "Fill in the details for the item to be procured"}
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                <div>
+              <div className="space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto pr-2">
+                <div className="space-y-2">
                   <Label>
                     Item Description <span className="text-red-500">*</span>
                   </Label>
@@ -889,12 +1146,17 @@ export function CreateWizard({
                         itemDescription: e.target.value,
                       })
                     }
-                    placeholder="Enter item description"
+                    placeholder="Enter a detailed description of the item"
                     rows={3}
+                    className="resize-none"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Provide a clear and detailed description of the item
+                  </p>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-2">
                     <Label>
                       Unit of Measure <span className="text-red-500">*</span>
                     </Label>
@@ -906,10 +1168,13 @@ export function CreateWizard({
                           unitOfMeasure: e.target.value,
                         })
                       }
-                      placeholder="e.g., unit, set, piece"
+                      placeholder="e.g., unit, set, piece, box"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Standard unit for measuring quantity
+                    </p>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>
                       Quantity <span className="text-red-500">*</span>
                     </Label>
@@ -925,14 +1190,18 @@ export function CreateWizard({
                           estimatedTotalCost: total,
                         });
                       }}
-                      placeholder="0"
+                      placeholder="0.00"
                       min="0"
                       step="0.01"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Number of units needed
+                    </p>
                   </div>
                 </div>
-                <div>
-                  <Label>Size / Specification</Label>
+
+                <div className="space-y-2">
+                  <Label>Size / Specification (Optional)</Label>
                   <Textarea
                     value={newItem.sizeSpecification ?? ""}
                     onChange={(e) =>
@@ -941,57 +1210,84 @@ export function CreateWizard({
                         sizeSpecification: e.target.value,
                       })
                     }
-                    placeholder="Enter size or specification"
+                    placeholder="Enter size, dimensions, or technical specifications"
                     rows={2}
+                    className="resize-none"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Additional technical details or specifications
+                  </p>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-2">
                     <Label>
                       Estimated Unit Cost{" "}
                       <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      type="number"
-                      value={
-                        newItem.estimatedUnitCost === 0
-                          ? ""
-                          : newItem.estimatedUnitCost
-                      }
-                      onChange={(e) => {
-                        const cost = parseFloat(e.target.value) || 0;
-                        const total = cost * newItem.quantity;
-                        setNewItem({
-                          ...newItem,
-                          estimatedUnitCost: cost,
-                          estimatedTotalCost: total,
-                        });
-                      }}
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        ₱
+                      </span>
+                      <Input
+                        type="number"
+                        value={
+                          newItem.estimatedUnitCost === 0
+                            ? ""
+                            : newItem.estimatedUnitCost
+                        }
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          const total = cost * newItem.quantity;
+                          setNewItem({
+                            ...newItem,
+                            estimatedUnitCost: cost,
+                            estimatedTotalCost: total,
+                          });
+                        }}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                        className="pl-8"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Cost per unit
+                    </p>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>
                       Estimated Total Cost{" "}
                       <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      type="number"
-                      value={
-                        newItem.estimatedTotalCost === 0
-                          ? ""
-                          : newItem.estimatedTotalCost
-                      }
-                      onChange={(e) => {
-                        const total = parseFloat(e.target.value) || 0;
-                        setNewItem({ ...newItem, estimatedTotalCost: total });
-                      }}
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        ₱
+                      </span>
+                      <Input
+                        type="number"
+                        value={
+                          newItem.estimatedTotalCost === 0
+                            ? ""
+                            : newItem.estimatedTotalCost
+                        }
+                        onChange={(e) => {
+                          const total = parseFloat(e.target.value) || 0;
+                          setNewItem({
+                            ...newItem,
+                            estimatedTotalCost: total,
+                          });
+                        }}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                        className="pl-8 font-semibold"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Calculator className="h-3 w-3" />
+                      Auto-calculated: Quantity × Unit Cost
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1024,308 +1320,485 @@ export function CreateWizard({
     );
   };
 
-  const renderStep4 = () => (
-    <div className="space-y-4">
-      <Form {...step4Form}>
-        <FormField
-          control={step4Form.control}
-          name="suggestedModeOfProcurement"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Suggested Mode of Procurement</FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  placeholder="e.g., Public Bidding, Shopping"
-                />
-              </FormControl>
-              <FormDescription>
-                This is advisory. BAC will finalize the procurement method
-                during APP stage.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+  const renderStep4 = () => {
+    const procurementStartMonth = step4Form.watch("procurementStartMonth");
+    const procurementStartYear = step4Form.watch("procurementStartYear");
+    const procurementEndMonth = step4Form.watch("procurementEndMonth");
+    const procurementEndYear = step4Form.watch("procurementEndYear");
+    const deliveryStartMonth = step4Form.watch("deliveryStartMonth");
+    const deliveryStartYear = step4Form.watch("deliveryStartYear");
+    const deliveryEndMonth = step4Form.watch("deliveryEndMonth");
+    const deliveryEndYear = step4Form.watch("deliveryEndYear");
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm font-medium mb-2">Start of Procurement</p>
-            <div className="grid grid-cols-2 gap-2">
-              <FormField
-                control={step4Form.control}
-                name="procurementStartMonth"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            {new Date(2000, i, 1).toLocaleString("default", {
-                              month: "long",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={step4Form.control}
-                name="procurementStartYear"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => {
-                          const year = new Date().getFullYear() + i;
-                          return (
-                            <SelectItem key={year} value={String(year)}>
-                              {year}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
+    const formatDate = (
+      month: number | undefined,
+      year: number | undefined
+    ) => {
+      if (!month || !year) return "Not set";
+      const monthName = new Date(2000, month - 1, 1).toLocaleString("default", {
+        month: "short",
+      });
+      return `${monthName} ${year}`;
+    };
 
-          <div>
-            <p className="text-sm font-medium mb-2">End of Procurement</p>
-            <div className="grid grid-cols-2 gap-2">
-              <FormField
-                control={step4Form.control}
-                name="procurementEndMonth"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            {new Date(2000, i, 1).toLocaleString("default", {
-                              month: "long",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={step4Form.control}
-                name="procurementEndYear"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => {
-                          const year = new Date().getFullYear() + i;
-                          return (
-                            <SelectItem key={year} value={String(year)}>
-                              {year}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h3 className="text-xl font-semibold flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Procurement Schedule
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Set the timeline for procurement and delivery/implementation
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm font-medium mb-2">
-              Delivery/Implementation Start
-            </p>
-            <div className="grid grid-cols-2 gap-2">
+        <Form {...step4Form}>
+          {/* Mode of Procurement */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Procurement Method</CardTitle>
+              <CardDescription>
+                Suggest a preferred procurement method (advisory only)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <FormField
                 control={step4Form.control}
-                name="deliveryStartMonth"
+                name="suggestedModeOfProcurement"
                 render={({ field }) => (
                   <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            {new Date(2000, i, 1).toLocaleString("default", {
-                              month: "long",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Suggested Mode of Procurement</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g., Public Bidding, Shopping, Negotiated Procurement"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      This is advisory. BAC will finalize the procurement method
+                      during APP stage.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={step4Form.control}
-                name="deliveryStartYear"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => {
-                          const year = new Date().getFullYear() + i;
-                          return (
-                            <SelectItem key={year} value={String(year)}>
-                              {year}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div>
-            <p className="text-sm font-medium mb-2">
-              Delivery/Implementation End
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <FormField
-                control={step4Form.control}
-                name="deliveryEndMonth"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            {new Date(2000, i, 1).toLocaleString("default", {
-                              month: "long",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+          {/* Procurement Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Procurement Timeline
+              </CardTitle>
+              <CardDescription>
+                Define when the procurement process will start and end
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium">
+                    Start Date
+                  </FormLabel>
+                  <div className="flex gap-3">
+                    <FormField
+                      control={step4Form.control}
+                      name="procurementStartMonth"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Month" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {new Date(2000, i, 1).toLocaleString(
+                                    "default",
+                                    { month: "long" }
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={step4Form.control}
+                      name="procurementStartYear"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Year" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 5 }, (_, i) => {
+                                const year = new Date().getFullYear() + i;
+                                return (
+                                  <SelectItem key={year} value={String(year)}>
+                                    {year}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {procurementStartMonth && procurementStartYear && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(procurementStartMonth, procurementStartYear)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium">
+                    End Date
+                  </FormLabel>
+                  <div className="flex gap-3">
+                    <FormField
+                      control={step4Form.control}
+                      name="procurementEndMonth"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Month" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {new Date(2000, i, 1).toLocaleString(
+                                    "default",
+                                    { month: "long" }
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={step4Form.control}
+                      name="procurementEndYear"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Year" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 5 }, (_, i) => {
+                                const year = new Date().getFullYear() + i;
+                                return (
+                                  <SelectItem key={year} value={String(year)}>
+                                    {year}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {procurementEndMonth && procurementEndYear && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(procurementEndMonth, procurementEndYear)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Visual Timeline Indicator */}
+              {procurementStartMonth &&
+                procurementStartYear &&
+                procurementEndMonth &&
+                procurementEndYear && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">
+                        Procurement Period:
+                      </span>
+                      <span className="font-medium">
+                        {formatDate(
+                          procurementStartMonth,
+                          procurementStartYear
+                        )}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">
+                        {formatDate(procurementEndMonth, procurementEndYear)}
+                      </span>
+                    </div>
+                  </div>
                 )}
-              />
-              <FormField
-                control={step4Form.control}
-                name="deliveryEndYear"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(value ? parseInt(value) : undefined)
-                      }
-                      value={field.value ? String(field.value) : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => {
-                          const year = new Date().getFullYear() + i;
-                          return (
-                            <SelectItem key={year} value={String(year)}>
-                              {year}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+            </CardContent>
+          </Card>
+
+          {/* Delivery/Implementation Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Delivery/Implementation Timeline
+              </CardTitle>
+              <CardDescription>
+                Define when delivery or implementation will start and end
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium">
+                    Start Date
+                  </FormLabel>
+                  <div className="flex gap-3">
+                    <FormField
+                      control={step4Form.control}
+                      name="deliveryStartMonth"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Month" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {new Date(2000, i, 1).toLocaleString(
+                                    "default",
+                                    { month: "long" }
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={step4Form.control}
+                      name="deliveryStartYear"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Year" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 5 }, (_, i) => {
+                                const year = new Date().getFullYear() + i;
+                                return (
+                                  <SelectItem key={year} value={String(year)}>
+                                    {year}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {deliveryStartMonth && deliveryStartYear && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(deliveryStartMonth, deliveryStartYear)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium">
+                    End Date
+                  </FormLabel>
+                  <div className="flex gap-3">
+                    <FormField
+                      control={step4Form.control}
+                      name="deliveryEndMonth"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Month" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {new Date(2000, i, 1).toLocaleString(
+                                    "default",
+                                    { month: "long" }
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={step4Form.control}
+                      name="deliveryEndYear"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(
+                                value ? parseInt(value) : undefined
+                              )
+                            }
+                            value={
+                              field.value ? String(field.value) : undefined
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Year" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 5 }, (_, i) => {
+                                const year = new Date().getFullYear() + i;
+                                return (
+                                  <SelectItem key={year} value={String(year)}>
+                                    {year}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {deliveryEndMonth && deliveryEndYear && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(deliveryEndMonth, deliveryEndYear)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Visual Timeline Indicator */}
+              {deliveryStartMonth &&
+                deliveryStartYear &&
+                deliveryEndMonth &&
+                deliveryEndYear && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">
+                        Delivery Period:
+                      </span>
+                      <span className="font-medium">
+                        {formatDate(deliveryStartMonth, deliveryStartYear)}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">
+                        {formatDate(deliveryEndMonth, deliveryEndYear)}
+                      </span>
+                    </div>
+                  </div>
                 )}
-              />
-            </div>
-          </div>
-        </div>
-      </Form>
-    </div>
-  );
+            </CardContent>
+          </Card>
+        </Form>
+      </div>
+    );
+  };
 
   const renderStep5 = () => {
     const totalFromItems = items.reduce(
@@ -1348,9 +1821,15 @@ export function CreateWizard({
                 </FormLabel>
                 <Select
                   onValueChange={(value) => {
+                    // Update field value
                     field.onChange(value);
+                    // Also use setValue to ensure validation runs immediately
+                    step5Form.setValue("sourceOfFunds", value, {
+                      shouldValidate: true,
+                      shouldTouch: true,
+                    });
                   }}
-                  value={field.value}
+                  value={field.value || undefined}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -1381,87 +1860,77 @@ export function CreateWizard({
             )}
           />
 
-          {/* LASA Visibility Section */}
+          {/* LASA Selection Section */}
           {step5Form.watch("sourceOfFunds") && (
             <div className="pt-4 border-t">
-              <div className="mb-3">
-                <h4 className="text-sm font-semibold text-gray-700 mb-1">
-                  LASA Budget Visibility (Planning Reference)
-                </h4>
-                <p className="text-xs text-gray-500">
-                  Showing available budget visibility from LASA for reference.
-                  This does not block PPMP creation.
-                </p>
-              </div>
-              {loadingLasa ? (
-                <div className="text-sm text-gray-500 py-2">
-                  Loading LASA data...
-                </div>
-              ) : lasaRows.length > 0 ? (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {lasaRows.map((row) => (
-                    <div
-                      key={row.id}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
-                    >
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-700">
-                          {row.project_title}
-                        </div>
-                        {row.office && (
-                          <div className="text-xs text-gray-500">
-                            {row.office.name}
+              <FormField
+                control={step5Form.control}
+                name="lasaId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Link to LASA (Optional)</FormLabel>
+                    {loadingLasa ? (
+                      <div className="text-sm text-gray-500 py-2">
+                        Loading LASA data...
+                      </div>
+                    ) : lasaRows.length > 0 ? (
+                      <div className="space-y-2">
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(
+                              value === "none" ? undefined : value
+                            );
+                          }}
+                          value={
+                            field.value && field.value !== ""
+                              ? field.value
+                              : "none"
+                          }
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a LASA row" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {lasaRows.map((row) => (
+                              <SelectItem key={row.id} value={String(row.id)}>
+                                {row.project_title} -{" "}
+                                {new Intl.NumberFormat("en-PH", {
+                                  style: "currency",
+                                  currency: "PHP",
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0,
+                                }).format(row.planned_amount)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Select a LASA row where you are the proponent. This
+                          links the PPMP to the LASA budget.
+                        </FormDescription>
+                        {field.value && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                            Selected LASA:{" "}
+                            {
+                              lasaRows.find((r) => String(r.id) === field.value)
+                                ?.project_title
+                            }
                           </div>
                         )}
                       </div>
-                      <div className="text-sm font-semibold text-gray-700">
-                        {new Intl.NumberFormat("en-PH", {
-                          style: "currency",
-                          currency: "PHP",
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        }).format(row.planned_amount)}
+                    ) : (
+                      <div className="text-sm text-gray-500 py-2">
+                        No LASA rows found where you are the proponent for this
+                        fiscal year and fund source.
                       </div>
-                    </div>
-                  ))}
-                  {step5Form.watch("totalBudgetAmount") > 0 && (
-                    <div className="mt-3 pt-2 border-t border-gray-300">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-gray-700">
-                          Total LASA Planned:
-                        </span>
-                        <span className="font-semibold text-gray-700">
-                          {new Intl.NumberFormat("en-PH", {
-                            style: "currency",
-                            currency: "PHP",
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0,
-                          }).format(
-                            lasaRows.reduce(
-                              (sum, row) => sum + row.planned_amount,
-                              0
-                            )
-                          )}
-                        </span>
-                      </div>
-                      {step5Form.watch("totalBudgetAmount") >
-                        lasaRows.reduce(
-                          (sum, row) => sum + row.planned_amount,
-                          0
-                        ) && (
-                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                          ⚠️ PPMP budget exceeds total LASA planned amount. This
-                          is informational only.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 py-2">
-                  No LASA rows found for this fiscal year and fund source.
-                </div>
-              )}
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           )}
 
@@ -1530,29 +1999,45 @@ export function CreateWizard({
     const projectType = step1Data.projectType;
 
     const handleFileUpload = async (file: UploadedFile) => {
-      setAttachments([...attachments, file]);
-
-      // Save attachment to database if PPMP exists
+      // Save attachment to database if PPMP exists first
+      let attachmentId: string | undefined = undefined;
       if (ppmpId) {
         try {
-          await supabase.from("ppmp_attachments").insert({
-            ppmp_id: parseInt(ppmpId),
-            document_type: file.documentType,
-            file_name: file.fileName,
-            file_url: file.fileUrl,
-            file_size: file.fileSize,
-            mime_type: file.mimeType,
-            is_required: file.isRequired,
-            uploaded_by: user?.id ? parseInt(String(user.id)) : null,
-          });
+          const { data, error } = await supabase
+            .from("ppmp_attachments")
+            .insert({
+              ppmp_id: parseInt(ppmpId),
+              document_type: file.documentType,
+              file_name: file.fileName,
+              file_url: file.fileUrl,
+              file_size: file.fileSize,
+              mime_type: file.mimeType,
+              is_required: file.isRequired,
+              uploaded_by: user?.id ? parseInt(String(user.id)) : null,
+            })
+            .select("id")
+            .single();
+
+          if (!error && data) {
+            attachmentId = data.id;
+          }
         } catch (error) {
           console.error("Failed to save attachment:", error);
         }
       }
+
+      // Update state with the file (including ID if available)
+      setAttachments((prev) => {
+        // Check if file already exists to avoid duplicates
+        const exists = prev.some((a) => a.fileUrl === file.fileUrl);
+        if (exists) return prev;
+        return [...prev, { ...file, id: attachmentId || file.id }];
+      });
     };
 
     const handleFileDelete = async (fileUrl: string) => {
-      setAttachments(attachments.filter((a) => a.fileUrl !== fileUrl));
+      // Use functional update to ensure we have the latest state
+      setAttachments((prev) => prev.filter((a) => a.fileUrl !== fileUrl));
 
       // Delete from database if PPMP exists
       if (ppmpId) {
@@ -1662,8 +2147,32 @@ export function CreateWizard({
     );
   };
 
+  // Helper function to check if step 1 is valid
+  const isStep1Valid = () => {
+    const values = step1Form.getValues();
+    const result = step1Schema.safeParse(values);
+    return result.success;
+  };
+
+  // Helper function to check if step 4 is valid
+  const isStep4Valid = () => {
+    const values = step4Form.getValues();
+    const result = step4Schema.safeParse(values);
+    return result.success;
+  };
+
+  // Helper function to check if step 5 is valid
+  const isStep5Valid = () => {
+    const values = step5Form.getValues();
+    const result = step5Schema.safeParse(values);
+    return result.success;
+  };
+
   const renderStep7 = () => {
     const isNewVersion = editData && editData.version > 1;
+    const step1Valid = isStep1Valid();
+    const step4Valid = isStep4Valid();
+    const step5Valid = isStep5Valid();
 
     return (
       <div className="space-y-4">
@@ -1717,13 +2226,9 @@ export function CreateWizard({
             <div className="space-y-1 text-sm">
               <div className="flex items-center gap-2">
                 <span
-                  className={
-                    step1Form.formState.isValid
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }
+                  className={step1Valid ? "text-green-600" : "text-red-600"}
                 >
-                  {step1Form.formState.isValid ? "✓" : "✗"}
+                  {step1Valid ? "✓" : "✗"}
                 </span>
                 <span>Step 1: Header & Project Info</span>
               </div>
@@ -1739,25 +2244,17 @@ export function CreateWizard({
               </div>
               <div className="flex items-center gap-2">
                 <span
-                  className={
-                    step4Form.formState.isValid
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }
+                  className={step4Valid ? "text-green-600" : "text-red-600"}
                 >
-                  {step4Form.formState.isValid ? "✓" : "✗"}
+                  {step4Valid ? "✓" : "✗"}
                 </span>
                 <span>Step 3: Procurement Schedule</span>
               </div>
               <div className="flex items-center gap-2">
                 <span
-                  className={
-                    step5Form.formState.isValid
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }
+                  className={step5Valid ? "text-green-600" : "text-red-600"}
                 >
-                  {step5Form.formState.isValid ? "✓" : "✗"}
+                  {step5Valid ? "✓" : "✗"}
                 </span>
                 <span>Step 4: Budget & Funding</span>
               </div>
@@ -1820,16 +2317,6 @@ export function CreateWizard({
                 disabled={isSubmitting}
               >
                 Previous
-              </Button>
-            )}
-            {!editData && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSaveDraft}
-                disabled={isSubmitting}
-              >
-                Save as Draft
               </Button>
             )}
           </div>

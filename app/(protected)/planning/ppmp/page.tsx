@@ -22,6 +22,7 @@ export default function Page() {
   const [modalViewOpen, setModalViewOpen] = useState(false);
   const [selectedPPMPId, setSelectedPPMPId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [filter, setFilter] = useState<PPMPFilter>({
     keyword: "",
   });
@@ -39,11 +40,20 @@ export default function Page() {
   // Fetch offices and schools for filter
   useEffect(() => {
     const fetchOfficesAndSchools = async () => {
+      const divisionId = process.env.NEXT_PUBLIC_DIVISION_ID
+        ? parseInt(process.env.NEXT_PUBLIC_DIVISION_ID)
+        : null;
+
+      if (!divisionId) {
+        console.error("NEXT_PUBLIC_DIVISION_ID is not set");
+        return;
+      }
+
       // Fetch offices
       const { data: offices } = await supabase
         .from("offices")
         .select("*")
-        .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID)
+        .eq("division_id", divisionId)
         .eq("is_active", true)
         .order("name");
 
@@ -53,7 +63,7 @@ export default function Page() {
       const { data: schools } = await supabase
         .from("schools")
         .select("*")
-        .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID)
+        .eq("division_id", divisionId)
         .eq("is_active", true)
         .order("name");
 
@@ -71,6 +81,17 @@ export default function Page() {
       setLoading(true);
       dispatch(addList([])); // Reset the list
 
+      const divisionId = process.env.NEXT_PUBLIC_DIVISION_ID
+        ? parseInt(process.env.NEXT_PUBLIC_DIVISION_ID)
+        : null;
+
+      if (!divisionId) {
+        console.error("NEXT_PUBLIC_DIVISION_ID is not set");
+        setLoading(false);
+        toast.error("Configuration error: Division ID not set");
+        return;
+      }
+
       let query = supabase
         .from("ppmp")
         .select(
@@ -87,7 +108,7 @@ export default function Page() {
         `,
           { count: "exact" }
         )
-        .eq("division_id", process.env.NEXT_PUBLIC_DIVISION_ID)
+        .eq("division_id", divisionId)
         .is("deleted_at", null);
 
       // Apply filters
@@ -143,7 +164,7 @@ export default function Page() {
     return () => {
       isMounted = false;
     };
-  }, [page, filterKeyword, filter, dispatch]);
+  }, [page, filterKeyword, filter, dispatch, refreshKey]);
 
   const handleView = (item: PPMPWithRelations) => {
     setSelectedPPMPId(item.id);
@@ -163,7 +184,8 @@ export default function Page() {
   };
 
   const handleCreateComplete = () => {
-    // Refresh the list
+    // Refresh the list by incrementing refreshKey to trigger useEffect
+    setRefreshKey((prev) => prev + 1);
     setPage(1);
     setModalCreateOpen(false);
     setSelectedPPMPId(null);

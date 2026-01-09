@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PPMPAttachmentType } from "@/types/database";
 import { FileText, Trash2, Upload } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 export interface UploadedFile {
@@ -61,6 +61,11 @@ export function FileUpload({
 }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>(existingFiles);
+
+  // Sync files with existingFiles prop when it changes
+  useEffect(() => {
+    setFiles(existingFiles);
+  }, [existingFiles]);
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
