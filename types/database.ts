@@ -400,6 +400,35 @@ export interface LasaRowWithRelations extends LasaRow {
 }
 
 // ============================================================================
+// BUDGET ALLOCATIONS
+// ============================================================================
+
+export type BudgetAllocationStatus = "draft" | "active" | "closed";
+
+export interface BudgetAllocation {
+  id: string;
+  division_id: string;
+  fiscal_year: number;
+  allocation_name: string;
+  allocation_amount: number;
+  fund_source: string;
+  status: BudgetAllocationStatus;
+  remarks?: string | null;
+  lasa_id?: string | null;
+  proponent_id?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Extended Budget Allocation with relationships (for queries that include joins)
+export interface BudgetAllocationWithRelations extends BudgetAllocation {
+  lasa?: Pick<LasaRow, "id" | "project_title" | "fiscal_year" | "fund_source" | "planned_amount"> | null;
+  proponent?: Pick<User, "id" | "name" | "email"> | null;
+  created_by_user?: Pick<User, "id" | "name" | "email"> | null;
+}
+
+// ============================================================================
 // PRE-PROCUREMENT EVALUATION
 // ============================================================================
 

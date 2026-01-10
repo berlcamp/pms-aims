@@ -2,24 +2,16 @@
 
 import Notfoundpage from "@/components/Notfoundpage";
 import { TableSkeleton } from "@/components/TableSkeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { addList } from "@/lib/redux/listSlice";
 import { getLasaRows } from "@/lib/services/lasa";
 import { LasaRowWithRelations } from "@/types/database";
 import { format } from "date-fns";
-import { Lock, Eye } from "lucide-react";
+import { Eye, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { ViewModal } from "../planning/lasa/ViewModal";
+import { ViewModal } from "../../lasa/ViewModal";
 
 export default function Page() {
   const [totalCount, setTotalCount] = useState(0);
@@ -170,7 +162,9 @@ export default function Page() {
                           </span>
                         </td>
                         <td className="app__table_td">
-                          <span className="text-sm">{item.saro_number || "-"}</span>
+                          <span className="text-sm">
+                            {item.saro_number || "-"}
+                          </span>
                         </td>
                         <td className="app__table_td">
                           <span className="text-sm">{item.fiscal_year}</span>
@@ -224,4 +218,3 @@ export default function Page() {
     </div>
   );
 }
-

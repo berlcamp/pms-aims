@@ -4,6 +4,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  DollarSign,
   Home,
   ListCheck,
   Loader2,
@@ -87,24 +88,29 @@ export function AppSidebar() {
   }, [user]);
 
   const planningItems = useMemo(() => {
-    const items = [
+    return [
       {
         title: "PPMP",
         url: "/planning/ppmp",
         icon: ListCheck,
       },
     ];
+  }, []);
 
-    // Only show LASA if user has BUDGET_OFFICER role
-    if (isBudgetOfficer) {
-      items.push({
+  const budgetItems = useMemo(() => {
+    if (!isBudgetOfficer) return [];
+    return [
+      {
         title: "LASA (Budget Visibility)",
-        url: "/planning/lasa",
+        url: "/budget/lasa",
         icon: ListCheck,
-      });
-    }
-
-    return items;
+      },
+      {
+        title: "Budget Allocations",
+        url: "/budget/budget-allocations",
+        icon: DollarSign,
+      },
+    ];
   }, [isBudgetOfficer]);
 
   // Check if user can access User Accounts (Super Admin or Admin only)
@@ -251,6 +257,58 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Budget Planning Section */}
+        {isBudgetOfficer && (
+          <SidebarGroup className="px-2 py-4 relative">
+            <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white uppercase tracking-wider">
+              Budget Planning
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {budgetItems.map((item) => {
+                  const isActive = pathname === item.url;
+                  const isLoading = loadingPath === item.url;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <Link
+                          href={item.url}
+                          onClick={() => handleLinkClick(item.url)}
+                          className={cn(
+                            "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                            "hover:!bg-[#383838]",
+                            "focus-visible:outline-none",
+                            isLoading && "opacity-60 cursor-wait",
+                            isActive
+                              ? "bg-[#383838] text-white"
+                              : "text-white/90 hover:text-white"
+                          )}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                          ) : (
+                            <item.icon
+                              className={cn(
+                                "h-4 w-4 transition-colors duration-200",
+                                isActive
+                                  ? "text-white"
+                                  : "text-white/70 group-hover:text-white"
+                              )}
+                            />
+                          )}
+                          <span className="text-sm transition-colors duration-200">
+                            {item.title}
+                          </span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Settings Section */}
         <SidebarGroup className="px-2 py-4">

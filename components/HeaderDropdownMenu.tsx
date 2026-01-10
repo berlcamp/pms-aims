@@ -112,11 +112,24 @@ export default function HeaderDropdown() {
           {/* Lasa Assignments */}
           <DropdownMenuItem asChild>
             <Link
-              href="/proponent-lasa"
+              href="/budget/proponent/proponent-lasa"
               className="flex items-center gap-2 cursor-pointer"
             >
               <ClipboardList className="w-4 h-4" />
               <span>LASA Assignments</span>
+            </Link>
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          {/* Lasa Assignments */}
+          <DropdownMenuItem asChild>
+            <Link
+              href="/budget/proponent/proponent-budget-allocations"
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span>Budget Allocations Assignments</span>
             </Link>
           </DropdownMenuItem>
 

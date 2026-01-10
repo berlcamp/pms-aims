@@ -247,11 +247,6 @@ export const AddModal = ({
                       value={field.value || null}
                       onChange={(value) => field.onChange(value ?? null)}
                       placeholder="Select proponent"
-                      divisionId={
-                        user?.division_id
-                          ? String(user.division_id)
-                          : process.env.NEXT_PUBLIC_DIVISION_ID || null
-                      }
                       excludedTypes={[
                         "superintendent",
                         "office head",

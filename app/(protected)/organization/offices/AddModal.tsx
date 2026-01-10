@@ -376,7 +376,6 @@ export const AddModal = ({ isOpen, onClose, editData }: ModalProps) => {
                       onChange={field.onChange}
                       disabled={isSubmitting}
                       placeholder="Select head user (optional)"
-                      divisionId={divisionId || undefined}
                     />
                   </FormControl>
                   <FormMessage />

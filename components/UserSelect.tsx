@@ -12,14 +12,13 @@ import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { User } from "@/types/database";
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface UserSelectProps {
   value?: string | null;
   onChange: (value: string | null) => void;
   disabled?: boolean;
   placeholder?: string;
-  divisionId?: string | null;
   excludedTypes?: string[]; // User types to exclude from the list
 }
 
@@ -28,15 +27,17 @@ export function UserSelect({
   onChange,
   disabled = false,
   placeholder = "Select a user",
-  divisionId,
   excludedTypes = [],
 }: UserSelectProps) {
+  const divisionId = process.env.NEXT_PUBLIC_DIVISION_ID || null;
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const previousDebouncedQuery = useRef<string>("");
+  const previousIsOpen = useRef<boolean>(false);
 
   // Debounce search query
   useEffect(() => {
@@ -92,12 +93,33 @@ export function UserSelect({
       }
     };
 
-    if (isOpen && divisionId) {
-      fetchUsers();
-    } else if (isOpen && !divisionId) {
+    if (!isOpen) {
+      // Reset loading state when dropdown closes
+      setLoading(false);
+      setSearchQuery("");
+      previousDebouncedQuery.current = "";
+      previousIsOpen.current = false;
+      return;
+    }
+
+    if (!divisionId) {
       // Reset loading state when dropdown is open but no divisionId
       setLoading(false);
       setUsers([]);
+      previousIsOpen.current = isOpen;
+      return;
+    }
+
+    // Only fetch if dropdown just opened or if debouncedQuery changed while open
+    const justOpened = !previousIsOpen.current && isOpen;
+    const queryChanged = previousDebouncedQuery.current !== debouncedQuery;
+
+    if (justOpened || queryChanged) {
+      previousDebouncedQuery.current = debouncedQuery;
+      previousIsOpen.current = isOpen;
+      fetchUsers();
+    } else {
+      previousIsOpen.current = isOpen;
     }
   }, [isOpen, divisionId, debouncedQuery, excludedTypes]);
 

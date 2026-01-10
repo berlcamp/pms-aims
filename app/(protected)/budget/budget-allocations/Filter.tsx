@@ -14,33 +14,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserSelect } from "@/components/UserSelect";
+import { getLasaRows } from "@/lib/services/lasa";
+import { LasaRowWithRelations } from "@/types/database";
 import { Filter as FilterIcon, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-export interface LasaFilter {
+export interface BudgetAllocationFilter {
   keyword: string;
   fiscalYear?: number | "ALL";
-  proponentId?: string | null;
+  status?: "draft" | "active" | "closed" | "ALL";
+  lasaId?: string | null;
 }
 
 interface FilterProps {
-  filter: LasaFilter;
-  setFilter: (filter: LasaFilter) => void;
+  filter: BudgetAllocationFilter;
+  setFilter: (filter: BudgetAllocationFilter) => void;
   divisionId?: string;
 }
 
 const currentYear = new Date().getFullYear();
-const fiscalYears = Array.from({ length: 5 }, (_, i) => currentYear - i);
+const fiscalYears = Array.from({ length: 5 }, (_, i) => currentYear + i);
 
 export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
   const [keyword, setKeyword] = useState(filter.keyword || "");
   const [fiscalYear, setFiscalYear] = useState<number | "ALL">(
     filter.fiscalYear || "ALL"
   );
-  const [proponentId, setProponentId] = useState<string | null>(
-    filter.proponentId || null
+  const [status, setStatus] = useState<"draft" | "active" | "closed" | "ALL">(
+    filter.status || "ALL"
   );
+  const [lasaId, setLasaId] = useState<string | null>(filter.lasaId || null);
+  const [lasaOptions, setLasaOptions] = useState<LasaRowWithRelations[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const filterRef = useRef(filter);
 
@@ -48,6 +52,22 @@ export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
   useEffect(() => {
     filterRef.current = filter;
   }, [filter]);
+
+  // Fetch LASA options
+  useEffect(() => {
+    const fetchLasaOptions = async () => {
+      if (!divisionId) return;
+      try {
+        const data = await getLasaRows({
+          divisionId,
+        });
+        setLasaOptions(data || []);
+      } catch (error) {
+        console.error("Failed to fetch LASA options:", error);
+      }
+    };
+    fetchLasaOptions();
+  }, [divisionId]);
 
   // Debounce search input
   useEffect(() => {
@@ -59,15 +79,7 @@ export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword]);
 
-  // Handle proponent change
-  useEffect(() => {
-    setFilter({
-      ...filterRef.current,
-      proponentId: proponentId || undefined,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proponentId]);
-
+  // Handle fiscal year change
   const handleFiscalYearChange = (value: string) => {
     const year = value === "ALL" ? "ALL" : parseInt(value);
     setFiscalYear(year);
@@ -77,17 +89,43 @@ export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
     });
   };
 
+  // Handle status change
+  const handleStatusChange = (value: string) => {
+    const statusValue =
+      value === "ALL"
+        ? "ALL"
+        : (value as "draft" | "active" | "closed" | "ALL");
+    setStatus(statusValue);
+    setFilter({
+      ...filterRef.current,
+      status: statusValue === "ALL" ? undefined : statusValue,
+    });
+  };
+
+  // Handle LASA change
+  useEffect(() => {
+    setFilter({
+      ...filterRef.current,
+      lasaId: lasaId || undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lasaId]);
+
   const handleReset = () => {
     setKeyword("");
     setFiscalYear("ALL");
-    setProponentId(null);
+    setStatus("ALL");
+    setLasaId(null);
     setFilter({
       keyword: "",
     });
   };
 
   const activeFilterCount =
-    (fiscalYear !== "ALL" ? 1 : 0) + (proponentId ? 1 : 0) + (keyword ? 1 : 0);
+    (fiscalYear !== "ALL" ? 1 : 0) +
+    (status !== "ALL" ? 1 : 0) +
+    (lasaId ? 1 : 0) +
+    (keyword ? 1 : 0);
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -111,7 +149,7 @@ export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
           {/* Search */}
           <div>
             <label className="text-xs font-medium text-gray-700 mb-1.5 block">
-              Search LASA Rows
+              Search Budget Allocations
             </label>
             <div className="relative">
               <Search
@@ -121,7 +159,7 @@ export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
               <Input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Search by title, fund source, or SARO number..."
+                placeholder="Search by name, fund source, or remarks..."
                 className="pl-9 pr-9 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 w-full"
               />
               {keyword && (
@@ -160,23 +198,50 @@ export const Filter = ({ filter, setFilter, divisionId }: FilterProps) => {
             </Select>
           </div>
 
-          {/* Proponent */}
+          {/* Status */}
           <div>
             <label className="text-xs font-medium text-gray-700 mb-1.5 block">
-              Proponent
+              Status
             </label>
-            <UserSelect
-              value={proponentId}
-              onChange={setProponentId}
-              placeholder="All Proponents"
-              divisionId={divisionId}
-              excludedTypes={[
-                "superintendent",
-                "office head",
-                "budget officer",
-                "procurement officer",
-              ]}
-            />
+            <Select
+              value={status === "ALL" ? "ALL" : status}
+              onValueChange={handleStatusChange}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* LASA */}
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1.5 block">
+              LASA
+            </label>
+            <Select
+              value={lasaId || "ALL"}
+              onValueChange={(value) =>
+                setLasaId(value === "ALL" ? null : value)
+              }
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All LASA</SelectItem>
+                {lasaOptions.map((lasa) => (
+                  <SelectItem key={lasa.id} value={lasa.id}>
+                    {lasa.project_title} ({lasa.fiscal_year})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Reset Button */}
