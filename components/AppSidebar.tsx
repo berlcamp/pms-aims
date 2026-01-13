@@ -1,11 +1,15 @@
 "use client";
 
 import {
+  ArrowRightLeft,
   Award,
+  Boxes,
   Building2,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
+  Clock,
   DollarSign,
   FileSearch,
   FileText,
@@ -14,8 +18,12 @@ import {
   ListCheck,
   Loader2,
   Package,
+  PackageSearch,
   School,
+  Trash2,
+  Truck,
   User,
+  UserCheck,
 } from "lucide-react";
 
 import {
@@ -230,6 +238,54 @@ export function AppSidebar() {
     },
   ];
 
+  // Delivery & Inspection items
+  const deliveryInspectionItems = [
+    {
+      title: "Deliveries",
+      url: "/delivery-inspection/deliveries",
+      icon: Truck,
+    },
+    {
+      title: "Inspection & Acceptance (IAR)",
+      url: "/delivery-inspection/inspection-acceptance",
+      icon: ClipboardCheck,
+    },
+    {
+      title: "Backorders / Delays",
+      url: "/delivery-inspection/backorders-delays",
+      icon: Clock,
+    },
+  ];
+
+  // Asset & Inventory items
+  const assetInventoryItems = [
+    {
+      title: "Asset Registry",
+      url: "/asset-inventory/asset-registry",
+      icon: PackageSearch,
+    },
+    {
+      title: "Consumable Inventory",
+      url: "/asset-inventory/consumable-inventory",
+      icon: Boxes,
+    },
+    {
+      title: "Custodian Assignments",
+      url: "/asset-inventory/custodian-assignments",
+      icon: UserCheck,
+    },
+    {
+      title: "Transfers",
+      url: "/asset-inventory/transfers",
+      icon: ArrowRightLeft,
+    },
+    {
+      title: "Disposal",
+      url: "/asset-inventory/disposal",
+      icon: Trash2,
+    },
+  ];
+
   return (
     <Sidebar className="pt-11 border-r border-gray-700/50">
       <SidebarContent className="bg-[#282828]">
@@ -390,6 +446,106 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {procurementExecutionItems.map((item) => {
+                const isActive = pathname === item.url;
+                const isLoading = loadingPath === item.url;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link
+                        href={item.url}
+                        onClick={() => handleLinkClick(item.url)}
+                        className={cn(
+                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          "hover:!bg-[#383838]",
+                          "focus-visible:outline-none",
+                          isLoading && "opacity-60 cursor-wait",
+                          isActive
+                            ? "bg-[#383838] text-white"
+                            : "text-white/90 hover:text-white"
+                        )}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                        ) : (
+                          <item.icon
+                            className={cn(
+                              "h-4 w-4 transition-colors duration-200",
+                              isActive
+                                ? "text-white"
+                                : "text-white/70 group-hover:text-white"
+                            )}
+                          />
+                        )}
+                        <span className="text-sm transition-colors duration-200">
+                          {item.title}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Delivery & Inspection Section */}
+        <SidebarGroup className="px-2 py-4 relative">
+          <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white uppercase tracking-wider">
+            Delivery & Inspection
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {deliveryInspectionItems.map((item) => {
+                const isActive = pathname === item.url;
+                const isLoading = loadingPath === item.url;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link
+                        href={item.url}
+                        onClick={() => handleLinkClick(item.url)}
+                        className={cn(
+                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          "hover:!bg-[#383838]",
+                          "focus-visible:outline-none",
+                          isLoading && "opacity-60 cursor-wait",
+                          isActive
+                            ? "bg-[#383838] text-white"
+                            : "text-white/90 hover:text-white"
+                        )}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                        ) : (
+                          <item.icon
+                            className={cn(
+                              "h-4 w-4 transition-colors duration-200",
+                              isActive
+                                ? "text-white"
+                                : "text-white/70 group-hover:text-white"
+                            )}
+                          />
+                        )}
+                        <span className="text-sm transition-colors duration-200">
+                          {item.title}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ASSET & INVENTORY Section */}
+        <SidebarGroup className="px-2 py-4 relative">
+          <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white uppercase tracking-wider">
+            ASSET & INVENTORY
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {assetInventoryItems.map((item) => {
                 const isActive = pathname === item.url;
                 const isLoading = loadingPath === item.url;
                 return (
