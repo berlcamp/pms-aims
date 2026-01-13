@@ -6,19 +6,16 @@ import { PER_PAGE } from "@/lib/constants";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook";
 import { addList } from "@/lib/redux/listSlice";
 import { supabase } from "@/lib/supabase/client";
-import { checkPPMPCreatePermission } from "@/lib/utils/ppmp-permissions";
 import { Office, PPMPWithRelations } from "@/types/database";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { CreateWizard } from "./CreateWizard";
+import { ViewModal } from "../ppmp/ViewModal";
 import { Filter, PPMPFilter } from "./Filter";
 import { List } from "./List";
-import { ViewModal } from "./ViewModal";
 
 export default function Page() {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [modalCreateOpen, setModalCreateOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
   const [selectedPPMPId, setSelectedPPMPId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -215,83 +212,27 @@ export default function Page() {
     setModalViewOpen(true);
   };
 
-  const handleEdit = (item: PPMPWithRelations) => {
-    // Always edit the latest version
-    const latestVersionId = groupedPPMPs.latestVersions.get(item.id);
-    const latestPPMP = latestVersionId
-      ? list.find((p) => p.id === latestVersionId)
-      : item;
-
-    if (!latestPPMP) {
-      toast.error("Latest version not found");
-      return;
-    }
-
-    // Check if latest version can be edited
-    if (latestPPMP.status !== "DRAFT" || latestPPMP.is_locked) {
-      toast.error("Only DRAFT PPMPs can be edited");
-      return;
-    }
-
-    setSelectedPPMPId(latestPPMP.id);
-    setModalCreateOpen(true);
-  };
-
-  const handlePrint = () => {
-    // TODO: Implement print functionality
-    toast("Print functionality coming soon");
-  };
-
-  const handleCreateComplete = () => {
-    // Refresh the list by incrementing refreshKey to trigger useEffect
-    setRefreshKey((prev) => prev + 1);
-    setPage(1);
-    setModalCreateOpen(false);
-    setSelectedPPMPId(null);
-  };
-
   const handleViewClose = () => {
     setModalViewOpen(false);
     setSelectedPPMPId(null);
   };
 
-  const canCreate = user ? checkPPMPCreatePermission(user) : false;
+  const handleActionComplete = () => {
+    // Refresh the list by incrementing refreshKey to trigger useEffect
+    setRefreshKey((prev) => prev + 1);
+    setPage(1);
+  };
 
   return (
     <div>
       <div className="app__title">
-        <h1 className="app__title_text">PPMP</h1>
+        <h1 className="app__title_text">APP</h1>
         <div className="app__title_actions">
           <Filter
             filter={filter}
             setFilter={setFilter}
             availableOffices={availableOffices}
           />
-          {canCreate && (
-            <Button
-              variant="green"
-              onClick={() => {
-                setSelectedPPMPId(null);
-                setModalCreateOpen(true);
-              }}
-              size="sm"
-            >
-              <svg
-                className="w-4 h-4 mr-1.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Create PPMP
-            </Button>
-          )}
         </div>
       </div>
       <div className="app__content">
@@ -318,16 +259,12 @@ export default function Page() {
             <p className="app__empty_state_description">
               {filterKeyword
                 ? "Try adjusting your search criteria"
-                : canCreate
-                ? "Get started by creating a new PPMP"
                 : "No PPMPs available"}
             </p>
           </div>
         ) : (
           <List
             onView={handleView}
-            onEdit={handleEdit}
-            onPrint={handlePrint}
             latestOnlyList={groupedPPMPs.latestOnlyList}
             versionGroups={groupedPPMPs.versionGroups}
             latestVersions={groupedPPMPs.latestVersions}
@@ -398,30 +335,13 @@ export default function Page() {
           </div>
         )}
 
-        {/* Create/Edit Modal */}
-        <CreateWizard
-          isOpen={modalCreateOpen}
-          onClose={() => {
-            setModalCreateOpen(false);
-            setSelectedPPMPId(null);
-          }}
-          editData={
-            selectedPPMPId
-              ? (list.find((item) => item.id === selectedPPMPId) as
-                  | PPMPWithRelations
-                  | undefined) || null
-              : null
-          }
-          onSubmitComplete={handleCreateComplete}
-        />
-
         {/* View Modal */}
         <ViewModal
           isOpen={modalViewOpen}
           onClose={handleViewClose}
           ppmpId={selectedPPMPId}
           user={user}
-          onActionComplete={handleCreateComplete}
+          onActionComplete={handleActionComplete}
         />
       </div>
     </div>

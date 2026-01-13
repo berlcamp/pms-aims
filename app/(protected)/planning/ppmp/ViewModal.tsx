@@ -28,8 +28,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 import { ExtendedUser } from "@/lib/redux/userSlice";
-import { getPPMPWithRelations } from "@/lib/services/ppmp";
+import { createNewVersion, getPPMPWithRelations } from "@/lib/services/ppmp";
+import { supabase } from "@/lib/supabase/client";
 import { PPMPWithRelations } from "@/types/database";
 import { format } from "date-fns";
 import {
@@ -46,9 +56,23 @@ import {
   Tag,
   User,
   XCircle,
+  Copy,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import toast from "react-hot-toast";
 import { ApprovalActions } from "./ApprovalActions";
+
+const createVersionSchema = z.object({
+  basisOfRevision: z
+    .string()
+    .min(1, "Basis of revision is required")
+    .min(10, "Basis of revision must be at least 10 characters"),
+});
+
+type CreateVersionFormData = z.infer<typeof createVersionSchema>;
 
 interface ViewModalProps {
   isOpen: boolean;
@@ -67,6 +91,15 @@ export function ViewModal({
 }: ViewModalProps) {
   const [ppmp, setPpmp] = useState<PPMPWithRelations | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showCreateVersionModal, setShowCreateVersionModal] = useState(false);
+  const [isCreatingVersion, setIsCreatingVersion] = useState(false);
+
+  const createVersionForm = useForm<CreateVersionFormData>({
+    resolver: zodResolver(createVersionSchema),
+    defaultValues: {
+      basisOfRevision: "",
+    },
+  });
 
   useEffect(() => {
     if (isOpen && ppmpId) {
@@ -104,6 +137,60 @@ export function ViewModal({
     if (!month || !year) return "-";
     const date = new Date(year, month - 1, 1);
     return format(date, "MMM yyyy");
+  };
+
+  const handleCreateVersion = async (data: CreateVersionFormData) => {
+    if (!ppmp || !user) {
+      toast.error("PPMP or user not found");
+      return;
+    }
+
+    setIsCreatingVersion(true);
+    try {
+      // Get the system user ID (database ID, not Supabase Auth UUID)
+      let systemUserId: string;
+      
+      if (user.system_user_id) {
+        // Use system_user_id if available
+        systemUserId = String(user.system_user_id);
+      } else {
+        // Fetch system user from database using email
+        const { data: systemUser, error: userError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("email", user.email)
+          .eq("is_active", true)
+          .single();
+
+        if (userError || !systemUser) {
+          throw new Error("System user not found. Please try logging in again.");
+        }
+
+        systemUserId = String(systemUser.id);
+      }
+
+      // The createNewVersion function creates a new version based on the provided PPMP
+      // It will automatically find the root version, increment the version number, and copy all data
+      // All versions use the same root version ID as parent_ppmp_id
+      await createNewVersion(ppmp.id, data.basisOfRevision, systemUserId);
+      toast.success("New version created successfully");
+      setShowCreateVersionModal(false);
+      createVersionForm.reset();
+      onActionComplete?.();
+      // Refresh the current PPMP to show updated data
+      if (ppmpId) {
+        getPPMPWithRelations(ppmpId).then(setPpmp);
+      }
+    } catch (error) {
+      console.error("Failed to create new version:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to create new version"
+      );
+    } finally {
+      setIsCreatingVersion(false);
+    }
   };
 
   if (!ppmp && !loading) {
@@ -905,23 +992,94 @@ export function ViewModal({
 
         {/* Action Buttons */}
         {ppmp && (
-          <DialogFooter>
-            <ApprovalActions
-              ppmp={ppmp}
-              user={user}
-              onActionComplete={() => {
-                onActionComplete?.();
-                if (ppmpId) {
-                  getPPMPWithRelations(ppmpId).then(setPpmp);
-                }
-              }}
-            />
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
+          <DialogFooter className="flex items-center justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateVersionModal(true)}
+                className="gap-2"
+              >
+                <Copy className="h-4 w-4" />
+                Create New Version
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <ApprovalActions
+                ppmp={ppmp}
+                user={user}
+                onActionComplete={() => {
+                  onActionComplete?.();
+                  if (ppmpId) {
+                    getPPMPWithRelations(ppmpId).then(setPpmp);
+                  }
+                }}
+              />
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+            </div>
           </DialogFooter>
         )}
       </DialogContent>
+
+      {/* Create New Version Modal */}
+      <Dialog
+        open={showCreateVersionModal}
+        onOpenChange={setShowCreateVersionModal}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Version</DialogTitle>
+            <DialogDescription>
+              Create a new version of this PPMP. The new version will be based
+              on the current PPMP data and will start as a DRAFT.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...createVersionForm}>
+            <form
+              onSubmit={createVersionForm.handleSubmit(handleCreateVersion)}
+              className="space-y-4"
+            >
+              <FormField
+                control={createVersionForm.control}
+                name="basisOfRevision"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Basis of Revision <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Explain the reason for creating a new version (e.g., budget changes, scope modifications, etc.)"
+                        rows={5}
+                        className="resize-none"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateVersionModal(false);
+                    createVersionForm.reset();
+                  }}
+                  disabled={isCreatingVersion}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isCreatingVersion}>
+                  {isCreatingVersion ? "Creating..." : "Create New Version"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

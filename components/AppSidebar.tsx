@@ -1,13 +1,19 @@
 "use client";
 
 import {
+  Award,
   Building2,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   DollarSign,
+  FileSearch,
+  FileText,
+  Gavel,
   Home,
   ListCheck,
   Loader2,
+  Package,
   School,
   User,
 } from "lucide-react";
@@ -50,14 +56,12 @@ export function AppSidebar() {
 
   // Reset loading state when pathname changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingPath(null);
   }, [pathname]);
 
   // Auto-expand Organization submenu if on Schools or Division Offices pages
   useEffect(() => {
     if (isOnOrganizationPage && !isOrganizationOpen) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       setIsOrganizationOpen(true);
     }
   }, [isOnOrganizationPage, isOrganizationOpen]);
@@ -87,30 +91,64 @@ export function AppSidebar() {
     return user.type === "budget officer" || user.type === "super admin";
   }, [user]);
 
+  // Check if user can access APP (Super Admin or Schools Division Superintendent)
+  const canAccessAPP = useMemo(() => {
+    if (!user) return false;
+    return (
+      user.type === "super admin" ||
+      user.type === "schools division superintendent"
+    );
+  }, [user]);
+
   const planningItems = useMemo(() => {
-    return [
+    const items: Array<{
+      title: string;
+      url: string;
+      icon: typeof ListCheck | typeof FileText;
+    }> = [
       {
         title: "PPMP",
         url: "/planning/ppmp",
         icon: ListCheck,
       },
     ];
-  }, []);
+
+    // Add APP if user has permission
+    if (canAccessAPP) {
+      items.push({
+        title: "APP",
+        url: "/planning/app",
+        icon: FileText,
+      });
+    }
+
+    return items;
+  }, [canAccessAPP]);
 
   const budgetItems = useMemo(() => {
-    if (!isBudgetOfficer) return [];
-    return [
-      {
-        title: "LASA (Budget Visibility)",
-        url: "/budget/lasa",
-        icon: ListCheck,
-      },
-      {
-        title: "Budget Allocations",
-        url: "/budget/budget-allocations",
-        icon: DollarSign,
-      },
-    ];
+    const items: Array<{
+      title: string;
+      url: string;
+      icon: typeof ListCheck | typeof DollarSign;
+    }> = [];
+
+    // Add LASA and Budget Allocations if user is budget officer
+    if (isBudgetOfficer) {
+      items.push(
+        {
+          title: "LASA (Budget Visibility)",
+          url: "/budget/lasa",
+          icon: ListCheck,
+        },
+        {
+          title: "Budget Allocations",
+          url: "/budget/budget-allocations",
+          icon: DollarSign,
+        }
+      );
+    }
+
+    return items;
   }, [isBudgetOfficer]);
 
   // Check if user can access User Accounts (Super Admin or Admin only)
@@ -157,6 +195,40 @@ export function AppSidebar() {
   const isOrganizationSubItemActive = organizationSubItems.some(
     (item) => pathname === item.url
   );
+
+  // Procurement Execution items
+  const procurementExecutionItems = [
+    {
+      title: "Purchase Requests (PR)",
+      url: "/procurement-execution/purchase-requests",
+      icon: ClipboardList,
+    },
+    {
+      title: "Pre-Procurement",
+      url: "/procurement-execution/pre-procurement",
+      icon: FileSearch,
+    },
+    {
+      title: "RFQ / Bidding",
+      url: "/procurement-execution/rfq-bidding",
+      icon: Gavel,
+    },
+    {
+      title: "Bid Evaluation",
+      url: "/procurement-execution/bid-evaluation",
+      icon: ListCheck,
+    },
+    {
+      title: "Notice of Award",
+      url: "/procurement-execution/notice-of-award",
+      icon: Award,
+    },
+    {
+      title: "Purchase Orders",
+      url: "/procurement-execution/purchase-orders",
+      icon: Package,
+    },
+  ];
 
   return (
     <Sidebar className="pt-11 border-r border-gray-700/50">
@@ -309,6 +381,56 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        {/* Procurement Execution Section */}
+        <SidebarGroup className="px-2 py-4 relative">
+          <SidebarGroupLabel className="px-3 mb-2 text-xs font-semibold text-white uppercase tracking-wider">
+            Procurement Execution
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1">
+              {procurementExecutionItems.map((item) => {
+                const isActive = pathname === item.url;
+                const isLoading = loadingPath === item.url;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link
+                        href={item.url}
+                        onClick={() => handleLinkClick(item.url)}
+                        className={cn(
+                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                          "hover:!bg-[#383838]",
+                          "focus-visible:outline-none",
+                          isLoading && "opacity-60 cursor-wait",
+                          isActive
+                            ? "bg-[#383838] text-white"
+                            : "text-white/90 hover:text-white"
+                        )}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 text-white/70 animate-spin" />
+                        ) : (
+                          <item.icon
+                            className={cn(
+                              "h-4 w-4 transition-colors duration-200",
+                              isActive
+                                ? "text-white"
+                                : "text-white/70 group-hover:text-white"
+                            )}
+                          />
+                        )}
+                        <span className="text-sm transition-colors duration-200">
+                          {item.title}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         {/* Settings Section */}
         <SidebarGroup className="px-2 py-4">

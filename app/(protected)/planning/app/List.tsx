@@ -11,14 +11,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAppSelector } from "@/lib/redux/hook";
 import { PPMPWithRelations } from "@/types/database";
-import { Eye, FileText, MoreVertical, Pencil, Sparkles } from "lucide-react";
+import { Eye, MoreVertical, Sparkles } from "lucide-react";
 
 type ItemType = PPMPWithRelations;
 
 interface ListProps {
   onView?: (item: ItemType) => void;
-  onEdit?: (item: ItemType) => void;
-  onPrint?: (item: ItemType) => void;
   latestOnlyList?: ItemType[];
   versionGroups?: Map<string, ItemType[]>;
   latestVersions?: Map<string, string>;
@@ -26,8 +24,6 @@ interface ListProps {
 
 export const List = ({
   onView,
-  onEdit,
-  onPrint,
   latestOnlyList,
   versionGroups,
   latestVersions,
@@ -80,10 +76,6 @@ export const List = ({
     if (!latestVersions) return true; // If no grouping, assume all are latest
     const latestId = latestVersions.get(item.id);
     return latestId === item.id;
-  };
-
-  const canEdit = (item: ItemType): boolean => {
-    return item.status === "DRAFT" && !item.is_locked && isLatestVersion(item);
   };
 
   return (
@@ -201,22 +193,6 @@ export const List = ({
                           >
                             <Eye className="mr-2 h-4 w-4" />
                             View
-                          </DropdownMenuItem>
-                          {canEdit(item) && (
-                            <DropdownMenuItem
-                              onClick={() => onEdit?.(item)}
-                              className="cursor-pointer"
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => onPrint?.(item)}
-                            className="cursor-pointer"
-                          >
-                            <FileText className="mr-2 h-4 w-4" />
-                            Print
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

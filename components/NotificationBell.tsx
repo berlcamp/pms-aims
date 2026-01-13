@@ -66,7 +66,10 @@ export function NotificationBell({
     if (notification.entity_type && notification.entity_id) {
       switch (notification.entity_type) {
         case "lasa_row":
-          router.push(`/proponent-lasa`);
+          router.push(`/budget/proponent/proponent-lasa`);
+          break;
+        case "budget_allocation":
+          router.push(`/budget/proponent/proponent-budget-allocations`);
           break;
         case "ppmp":
           router.push(`/planning/ppmp`);

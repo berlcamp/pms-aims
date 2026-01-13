@@ -18,7 +18,6 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [modalViewOpen, setModalViewOpen] = useState(false);
   const [viewLasaId, setViewLasaId] = useState<string | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.user.user);
@@ -61,7 +60,7 @@ export default function Page() {
     return () => {
       isMounted = false;
     };
-  }, [user?.system_user_id, dispatch, refetchTrigger]);
+  }, [user?.system_user_id, dispatch]);
 
   const handleView = (item: LasaRowWithRelations) => {
     setViewLasaId(item.id);

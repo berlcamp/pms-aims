@@ -557,45 +557,85 @@ export async function createNewVersion(
     throw new Error("Parent PPMP not found");
   }
 
-  // Generate new PPMP number (increment version)
-  const newVersion = parentPPMP.version + 1;
+  // Find the root version (the one with parent_ppmp_id = null)
+  let rootPPMP = parentPPMP;
+  let rootPPMPId = parentPPMPId;
+  
+  if (parentPPMP.parent_ppmp_id) {
+    // Traverse up to find the root version
+    let currentId = parentPPMP.parent_ppmp_id;
+    while (currentId) {
+      const currentPPMP = await getPPMPWithRelations(String(currentId));
+      if (!currentPPMP) break;
+      
+      rootPPMP = currentPPMP;
+      rootPPMPId = String(currentId);
+      
+      if (!currentPPMP.parent_ppmp_id) break;
+      currentId = currentPPMP.parent_ppmp_id;
+    }
+  }
+
+  // Get all versions with the same root parent to determine next version number
+  // This includes the root version itself (id = rootPPMPId) and all versions (parent_ppmp_id = rootPPMPId)
+  const { data: rootVersion } = await supabase
+    .from("ppmp")
+    .select("version")
+    .eq("id", rootPPMPId)
+    .is("deleted_at", null)
+    .single();
+
+  const { data: childVersions } = await supabase
+    .from("ppmp")
+    .select("version")
+    .eq("parent_ppmp_id", rootPPMPId)
+    .is("deleted_at", null);
+
+  // Find the maximum version number
+  const allVersions = [
+    ...(rootVersion ? [rootVersion] : []),
+    ...(childVersions || []),
+  ];
+  const maxVersion = allVersions.reduce((max, p) => Math.max(max, p.version), 0);
+  const newVersion = maxVersion + 1;
+
   const ppmpNumber = await generatePPMPNumber(
-    parentPPMP.office_id || null,
-    parentPPMP.school_id || null,
-    parentPPMP.fiscal_year
+    rootPPMP.office_id || null,
+    rootPPMP.school_id || null,
+    rootPPMP.fiscal_year
   );
 
-  // Create new PPMP
+  // Create new PPMP - always use root version ID as parent_ppmp_id
   const newPPMPData = {
     ppmp_number: ppmpNumber,
-    fiscal_year: parentPPMP.fiscal_year,
-    ppmp_type: parentPPMP.ppmp_type,
+    fiscal_year: rootPPMP.fiscal_year,
+    ppmp_type: rootPPMP.ppmp_type,
     version: newVersion,
-    parent_ppmp_id: parseInt(parentPPMPId),
+    parent_ppmp_id: parseInt(rootPPMPId),
     basis_of_revision: basisOfRevision,
-    division_id: parseInt(parentPPMP.division_id),
-    office_id: parentPPMP.office_id ? parseInt(parentPPMP.office_id) : null,
-    school_id: parentPPMP.school_id ? parseInt(parentPPMP.school_id) : null,
-    project_title: parentPPMP.project_title,
-    general_description: parentPPMP.general_description,
-    objective: parentPPMP.objective,
-    implementation_mode: parentPPMP.implementation_mode,
-    project_type: parentPPMP.project_type,
-    is_general_support_services: parentPPMP.is_general_support_services,
+    division_id: parseInt(rootPPMP.division_id),
+    office_id: rootPPMP.office_id ? parseInt(rootPPMP.office_id) : null,
+    school_id: rootPPMP.school_id ? parseInt(rootPPMP.school_id) : null,
+    project_title: rootPPMP.project_title,
+    general_description: rootPPMP.general_description,
+    objective: rootPPMP.objective,
+    implementation_mode: rootPPMP.implementation_mode,
+    project_type: rootPPMP.project_type,
+    is_general_support_services: rootPPMP.is_general_support_services,
     suggested_mode_of_procurement:
-      parentPPMP.suggested_mode_of_procurement || null,
-    procurement_start_month: parentPPMP.procurement_start_month || null,
-    procurement_start_year: parentPPMP.procurement_start_year || null,
-    procurement_end_month: parentPPMP.procurement_end_month || null,
-    procurement_end_year: parentPPMP.procurement_end_year || null,
-    delivery_start_month: parentPPMP.delivery_start_month || null,
-    delivery_start_year: parentPPMP.delivery_start_year || null,
-    delivery_end_month: parentPPMP.delivery_end_month || null,
-    delivery_end_year: parentPPMP.delivery_end_year || null,
-    source_of_funds: parentPPMP.source_of_funds,
-    total_budget_amount: parentPPMP.total_budget_amount,
-    estimated_budget: parentPPMP.estimated_budget || null,
-    authorized_budget: parentPPMP.authorized_budget || null,
+      rootPPMP.suggested_mode_of_procurement || null,
+    procurement_start_month: rootPPMP.procurement_start_month || null,
+    procurement_start_year: rootPPMP.procurement_start_year || null,
+    procurement_end_month: rootPPMP.procurement_end_month || null,
+    procurement_end_year: rootPPMP.procurement_end_year || null,
+    delivery_start_month: rootPPMP.delivery_start_month || null,
+    delivery_start_year: rootPPMP.delivery_start_year || null,
+    delivery_end_month: rootPPMP.delivery_end_month || null,
+    delivery_end_year: rootPPMP.delivery_end_year || null,
+    source_of_funds: rootPPMP.source_of_funds,
+    total_budget_amount: rootPPMP.total_budget_amount,
+    estimated_budget: rootPPMP.estimated_budget || null,
+    authorized_budget: rootPPMP.authorized_budget || null,
     status: "DRAFT" as PPMPStatus,
     is_locked: false,
     submitted_by: parseInt(submittedBy),
@@ -613,9 +653,9 @@ export async function createNewVersion(
 
   const newPPMPId = String(newPPMP.id);
 
-  // Copy lots
-  if (parentPPMP.lots && parentPPMP.lots.length > 0) {
-    const lotsData = parentPPMP.lots.map((lot, index) => ({
+  // Copy lots from the root version
+  if (rootPPMP.lots && rootPPMP.lots.length > 0) {
+    const lotsData = rootPPMP.lots.map((lot, index) => ({
       ppmp_id: parseInt(newPPMPId),
       lot_number: lot.lot_number,
       lot_name: lot.lot_name,
@@ -626,8 +666,8 @@ export async function createNewVersion(
     await supabase.from("ppmp_lots").insert(lotsData);
   }
 
-  // Copy items
-  if (parentPPMP.items && parentPPMP.items.length > 0) {
+  // Copy items from the root version
+  if (rootPPMP.items && rootPPMP.items.length > 0) {
     // Get new lot IDs
     const { data: newLots } = await supabase
       .from("ppmp_lots")
@@ -636,20 +676,20 @@ export async function createNewVersion(
       .order("lot_number");
 
     const lotMap = new Map(
-      parentPPMP.lots?.map((lot, index) => [
+      rootPPMP.lots?.map((lot, index) => [
         lot.lot_number,
         newLots?.find((nl) => nl.lot_number === lot.lot_number)?.id,
       ]) || []
     );
 
-    const itemsData = parentPPMP.items.map((item, index) => {
+    const itemsData = rootPPMP.items.map((item, index) => {
       let lotId: number | null = null;
       if (item.lot_id) {
-        const parentLot = parentPPMP.lots?.find(
+        const rootLot = rootPPMP.lots?.find(
           (l) => String(l.id) === item.lot_id
         );
-        if (parentLot) {
-          const newLotId = lotMap.get(parentLot.lot_number);
+        if (rootLot) {
+          const newLotId = lotMap.get(rootLot.lot_number);
           if (newLotId) lotId = parseInt(String(newLotId));
         }
       }

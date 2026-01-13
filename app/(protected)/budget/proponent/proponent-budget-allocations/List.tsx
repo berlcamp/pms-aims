@@ -11,16 +11,15 @@ import {
 import { useAppSelector } from "@/lib/redux/hook";
 import { BudgetAllocationWithRelations } from "@/types/database";
 import { format } from "date-fns";
-import { Eye, MoreVertical, Trash2 } from "lucide-react";
+import { Eye, MoreVertical } from "lucide-react";
 
 type ItemType = BudgetAllocationWithRelations;
 
 interface ListProps {
   onView?: (item: ItemType) => void;
-  onDelete?: (item: ItemType) => void;
 }
 
-export const List = ({ onView, onDelete }: ListProps) => {
+export const List = ({ onView }: ListProps) => {
   const list = useAppSelector((state) => state.list.value) as ItemType[];
 
   const formatCurrency = (amount: number) => {
@@ -138,13 +137,6 @@ export const List = ({ onView, onDelete }: ListProps) => {
                           >
                             <Eye className="mr-2 h-4 w-4" />
                             View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => onDelete?.(item)}
-                            className="cursor-pointer text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
